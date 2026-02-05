@@ -1,0 +1,18 @@
+# MinecraftServerController Configuration
+
+# API Settings
+api:
+  # API Base URL (e.g., http://localhost:8000/docs or http://your-server-ip:8000/docs)
+  url: "http://localhost:8000/docs"
+
+  # API Key (get from /register endpoint or use ROOT_API_KEY)
+  # Leave empty and it will show a warning in console
+  key: ""
+
+# Plugin Settings
+plugin:
+  # Enable debug logging
+  debug: false
+
+  # Async request timeout (seconds)
+  timeout: 30

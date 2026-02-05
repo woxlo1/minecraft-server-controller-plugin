@@ -1,0 +1,48 @@
+name: MinecraftServerController
+version: 1.0.0
+main: com.woxloi.minecraftservercontroller.MinecraftServerController
+api-version: 1.20
+author: woxloi
+description: Minecraft Server Control API Plugin
+
+commands:
+  msc:
+    description: Minecraft Server Controller main command
+    usage: /msc <subcommand>
+    permission: msc.use
+    aliases: [mcsc, servercontrol]
+
+permissions:
+  msc.use:
+    description: Basic MSC command access
+    default: true
+  msc.backup:
+    description: Create server backups
+    default: op
+  msc.backup.list:
+    description: List server backups
+    default: op
+  msc.backup.restore:
+    description: Restore server backups
+    default: op
+  msc.server:
+    description: View server status
+    default: true
+  msc.server.control:
+    description: Start/stop/restart server
+    default: op
+  msc.players:
+    description: View online players
+    default: true
+  msc.whitelist:
+    description: Manage whitelist
+    default: op
+  msc.exec:
+    description: Execute console commands
+    default: op
+  msc.admin:
+    description: Admin level access (OP, plugins, audit logs)
+    default: op
+  msc.reload:
+    description: Reload plugin configuration
+    default: op

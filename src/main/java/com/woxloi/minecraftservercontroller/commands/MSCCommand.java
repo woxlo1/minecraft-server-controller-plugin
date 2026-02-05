@@ -1,0 +1,699 @@
+package com.woxloi.minecraftservercontroller.commands;
+
+import com.woxloi.minecraftservercontroller.MinecraftServerController;
+import com.woxloi.minecraftservercontroller.api.APIClient;
+import com.woxloi.minecraftservercontroller.gui.MainMenuGUI;
+import org.bukkit.ChatColor;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class MSCCommand implements CommandExecutor, TabCompleter {
+    
+    private final MinecraftServerController plugin;
+    
+    public MSCCommand(MinecraftServerController plugin) {
+        this.plugin = plugin;
+    }
+    
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        
+        if (args.length == 0) {
+            // GUI を開く（プレイヤーの場合）
+            if (sender instanceof Player) {
+                Player player = (Player) sender;
+                new MainMenuGUI(plugin).open(player);
+                return true;
+            } else {
+                sendHelp(sender);
+                return true;
+            }
+        }
+        
+        String subCommand = args[0].toLowerCase();
+        
+        switch (subCommand) {
+            case "help":
+                sendHelp(sender);
+                return true;
+                
+            case "gui":
+                return handleGUI(sender);
+                
+            case "backup":
+                return handleBackup(sender, args);
+                
+            case "status":
+                return handleStatus(sender);
+                
+            case "players":
+                return handlePlayers(sender);
+                
+            case "exec":
+                return handleExec(sender, args);
+                
+            case "metrics":
+                return handleMetrics(sender);
+                
+            case "server":
+                return handleServer(sender, args);
+                
+            case "whitelist":
+                return handleWhitelist(sender, args);
+                
+            case "op":
+                return handleOp(sender, args);
+                
+            case "plugins":
+                return handlePlugins(sender, args);
+                
+            case "logs":
+                return handleLogs(sender, args);
+                
+            case "audit":
+                return handleAudit(sender);
+                
+            case "schedules":
+                return handleSchedules(sender);
+                
+            case "reload":
+                return handleReload(sender);
+                
+            default:
+                sender.sendMessage(ChatColor.RED + "Unknown subcommand: " + subCommand);
+                sender.sendMessage(ChatColor.YELLOW + "Use /msc help for available commands");
+                return true;
+        }
+    }
+    
+    private void sendHelp(CommandSender sender) {
+        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "MSC Commands" + ChatColor.GOLD + " ==========");
+        sender.sendMessage(ChatColor.YELLOW + "/msc" + ChatColor.WHITE + " - Open GUI menu");
+        sender.sendMessage(ChatColor.YELLOW + "/msc gui" + ChatColor.WHITE + " - Open GUI menu");
+        sender.sendMessage(ChatColor.YELLOW + "/msc help" + ChatColor.WHITE + " - Show this help");
+        sender.sendMessage(ChatColor.YELLOW + "/msc status" + ChatColor.WHITE + " - Server status");
+        sender.sendMessage(ChatColor.YELLOW + "/msc backup [list|delete|restore]" + ChatColor.WHITE + " - Backup management");
+        sender.sendMessage(ChatColor.YELLOW + "/msc server [start|stop]" + ChatColor.WHITE + " - Server control");
+        sender.sendMessage(ChatColor.YELLOW + "/msc players" + ChatColor.WHITE + " - Online players");
+        sender.sendMessage(ChatColor.YELLOW + "/msc whitelist [add|remove|list|on|off]" + ChatColor.WHITE + " - Whitelist management");
+        sender.sendMessage(ChatColor.YELLOW + "/msc op [add|remove] <player>" + ChatColor.WHITE + " - OP management");
+        sender.sendMessage(ChatColor.YELLOW + "/msc plugins [list|reload]" + ChatColor.WHITE + " - Plugin management");
+        sender.sendMessage(ChatColor.YELLOW + "/msc logs [tail]" + ChatColor.WHITE + " - View server logs");
+        sender.sendMessage(ChatColor.YELLOW + "/msc audit" + ChatColor.WHITE + " - View audit logs");
+        sender.sendMessage(ChatColor.YELLOW + "/msc schedules" + ChatColor.WHITE + " - Backup schedules");
+        sender.sendMessage(ChatColor.YELLOW + "/msc metrics" + ChatColor.WHITE + " - Server metrics");
+        sender.sendMessage(ChatColor.YELLOW + "/msc exec <command>" + ChatColor.WHITE + " - Execute command");
+        sender.sendMessage(ChatColor.YELLOW + "/msc reload" + ChatColor.WHITE + " - Reload config");
+    }
+    
+    private boolean handleGUI(CommandSender sender) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage(ChatColor.RED + "This command can only be used by players!");
+            return true;
+        }
+        
+        Player player = (Player) sender;
+        new MainMenuGUI(plugin).open(player);
+        return true;
+    }
+    
+    private boolean handleBackup(CommandSender sender, String[] args) {
+        if (args.length >= 2) {
+            String action = args[1].toLowerCase();
+            
+            switch (action) {
+                case "list":
+                    return handleBackupList(sender);
+                case "delete":
+                    if (args.length < 3) {
+                        sender.sendMessage(ChatColor.RED + "Usage: /msc backup delete <filename>");
+                        return true;
+                    }
+                    return handleBackupDelete(sender, args[2]);
+                case "restore":
+                    if (args.length < 3) {
+                        sender.sendMessage(ChatColor.RED + "Usage: /msc backup restore <filename>");
+                        return true;
+                    }
+                    return handleBackupRestore(sender, args[2]);
+                default:
+                    sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
+                    return true;
+            }
+        }
+        
+        if (!sender.hasPermission("msc.backup")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.YELLOW + "Creating backup...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                APIClient.BackupResult result = plugin.getAPIClient().createBackup();
+                sender.sendMessage(ChatColor.GREEN + "✓ Backup created: " + ChatColor.WHITE + result.filename);
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleBackupList(CommandSender sender) {
+        if (!sender.hasPermission("msc.backup.list")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.YELLOW + "Fetching backups...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                List<APIClient.BackupInfo> backups = plugin.getAPIClient().listBackups();
+                
+                if (backups.isEmpty()) {
+                    sender.sendMessage(ChatColor.YELLOW + "No backups found.");
+                    return;
+                }
+                
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Backups" + ChatColor.GOLD + " ==========");
+                for (APIClient.BackupInfo backup : backups) {
+                    sender.sendMessage(ChatColor.YELLOW + "• " + ChatColor.WHITE + backup.filename);
+                    sender.sendMessage(ChatColor.GRAY + "  Size: " + String.format("%.2f MB", backup.sizeMb) + 
+                                     " | Modified: " + backup.modified);
+                }
+                sender.sendMessage(ChatColor.GOLD + "Total: " + ChatColor.WHITE + backups.size());
+                
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleBackupDelete(CommandSender sender, String filename) {
+        if (!sender.hasPermission("msc.backup.restore")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.YELLOW + "Deleting backup...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                plugin.getAPIClient().deleteBackup(filename);
+                sender.sendMessage(ChatColor.GREEN + "✓ Backup deleted: " + ChatColor.WHITE + filename);
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleBackupRestore(CommandSender sender, String filename) {
+        if (!sender.hasPermission("msc.backup.restore")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.RED + "WARNING: This will stop the server and restore from backup!");
+        sender.sendMessage(ChatColor.YELLOW + "Restoring backup...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                APIClient.RestoreResult result = plugin.getAPIClient().restoreBackup(filename);
+                sender.sendMessage(ChatColor.GREEN + "✓ Backup restored: " + ChatColor.WHITE + result.backup);
+                sender.sendMessage(ChatColor.GRAY + "Pre-restore backup: " + result.preRestoreBackup);
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleStatus(CommandSender sender) {
+        if (!sender.hasPermission("msc.server")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.YELLOW + "Fetching status...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                APIClient.ServerStatus status = plugin.getAPIClient().getServerStatus();
+                
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Server Status" + ChatColor.GOLD + " ==========");
+                
+                String statusColor = status.status.equalsIgnoreCase("running") ? 
+                    ChatColor.GREEN + "" : ChatColor.RED + "";
+                sender.sendMessage(ChatColor.YELLOW + "Status: " + statusColor + status.status.toUpperCase());
+                
+                if (status.container != null && status.container.has("State")) {
+                    String state = status.container.get("State").getAsString();
+                    sender.sendMessage(ChatColor.YELLOW + "Container: " + ChatColor.WHITE + state);
+                }
+                
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handlePlayers(CommandSender sender) {
+        if (!sender.hasPermission("msc.players")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.YELLOW + "Fetching players...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                APIClient.PlayerList playerList = plugin.getAPIClient().getPlayers();
+                
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Players" + ChatColor.GOLD + " ==========");
+                sender.sendMessage(ChatColor.YELLOW + "Total: " + ChatColor.WHITE + playerList.count);
+                
+                if (!playerList.players.isEmpty()) {
+                    sender.sendMessage(ChatColor.YELLOW + "Players: " + ChatColor.WHITE + 
+                                     String.join(", ", playerList.players));
+                }
+                
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleExec(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.exec")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Usage: /msc exec <command>");
+            return true;
+        }
+        
+        String command = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+        
+        sender.sendMessage(ChatColor.YELLOW + "Executing: " + ChatColor.WHITE + command);
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                APIClient.CommandResult result = plugin.getAPIClient().executeCommand(command);
+                
+                sender.sendMessage(ChatColor.GREEN + "✓ Executed");
+                if (!result.output.isEmpty()) {
+                    sender.sendMessage(ChatColor.GRAY + "Output: " + ChatColor.WHITE + result.output);
+                }
+                
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleMetrics(CommandSender sender) {
+        if (!sender.hasPermission("msc.server")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.YELLOW + "Fetching metrics...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                APIClient.MetricsInfo metrics = plugin.getAPIClient().getMetrics();
+                
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Metrics" + ChatColor.GOLD + " ==========");
+                sender.sendMessage(ChatColor.YELLOW + "Memory Total: " + ChatColor.WHITE + 
+                                 String.format("%.2f GB", metrics.totalGb));
+                sender.sendMessage(ChatColor.YELLOW + "Memory Used: " + ChatColor.WHITE + 
+                                 String.format("%.2f GB", metrics.usedGb));
+                sender.sendMessage(ChatColor.YELLOW + "Usage: " + ChatColor.WHITE + 
+                                 String.format("%.1f%%", metrics.percent));
+                
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleServer(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.server.control")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Usage: /msc server [start|stop]");
+            return true;
+        }
+        
+        String action = args[1].toLowerCase();
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                String result;
+                if (action.equals("start")) {
+                    result = plugin.getAPIClient().startServer();
+                    sender.sendMessage(ChatColor.GREEN + "✓ Server starting: " + result);
+                } else if (action.equals("stop")) {
+                    result = plugin.getAPIClient().stopServer();
+                    sender.sendMessage(ChatColor.GREEN + "✓ Server stopping: " + result);
+                } else {
+                    sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
+                    return;
+                }
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleWhitelist(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.whitelist")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Usage: /msc whitelist [add|remove|list|on|off]");
+            return true;
+        }
+        
+        String action = args[1].toLowerCase();
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                switch (action) {
+                    case "add":
+                        if (args.length < 3) {
+                            sender.sendMessage(ChatColor.RED + "Usage: /msc whitelist add <player>");
+                            return;
+                        }
+                        String addResult = plugin.getAPIClient().whitelistAdd(args[2]);
+                        sender.sendMessage(ChatColor.GREEN + "✓ " + addResult);
+                        break;
+                        
+                    case "remove":
+                        if (args.length < 3) {
+                            sender.sendMessage(ChatColor.RED + "Usage: /msc whitelist remove <player>");
+                            return;
+                        }
+                        String removeResult = plugin.getAPIClient().whitelistRemove(args[2]);
+                        sender.sendMessage(ChatColor.GREEN + "✓ " + removeResult);
+                        break;
+                        
+                    case "list":
+                        List<String> whitelist = plugin.getAPIClient().getWhitelist();
+                        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Whitelist" + ChatColor.GOLD + " ==========");
+                        if (whitelist.isEmpty()) {
+                            sender.sendMessage(ChatColor.YELLOW + "No players whitelisted");
+                        } else {
+                            sender.sendMessage(ChatColor.YELLOW + "Players: " + ChatColor.WHITE + String.join(", ", whitelist));
+                        }
+                        break;
+                        
+                    case "on":
+                        String onResult = plugin.getAPIClient().whitelistEnable();
+                        sender.sendMessage(ChatColor.GREEN + "✓ " + onResult);
+                        break;
+                        
+                    case "off":
+                        String offResult = plugin.getAPIClient().whitelistDisable();
+                        sender.sendMessage(ChatColor.GREEN + "✓ " + offResult);
+                        break;
+                        
+                    default:
+                        sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
+                        break;
+                }
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleOp(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.admin")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        if (args.length < 3) {
+            sender.sendMessage(ChatColor.RED + "Usage: /msc op [add|remove] <player>");
+            return true;
+        }
+        
+        String action = args[1].toLowerCase();
+        String player = args[2];
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                String result;
+                if (action.equals("add")) {
+                    result = plugin.getAPIClient().opAdd(player);
+                } else if (action.equals("remove")) {
+                    result = plugin.getAPIClient().opRemove(player);
+                } else {
+                    sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
+                    return;
+                }
+                sender.sendMessage(ChatColor.GREEN + "✓ " + result);
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handlePlugins(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.admin")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        if (args.length < 2) {
+            args = new String[]{"plugins", "list"};
+        }
+        
+        String action = args[1].toLowerCase();
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                if (action.equals("list")) {
+                    List<APIClient.PluginInfo> plugins = plugin.getAPIClient().listPlugins();
+                    sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Plugins" + ChatColor.GOLD + " ==========");
+                    if (plugins.isEmpty()) {
+                        sender.sendMessage(ChatColor.YELLOW + "No plugins found");
+                    } else {
+                        for (APIClient.PluginInfo p : plugins) {
+                            sender.sendMessage(ChatColor.YELLOW + "• " + ChatColor.WHITE + p.name + 
+                                             ChatColor.GRAY + " (" + String.format("%.2f MB", p.sizeMb) + ")");
+                        }
+                    }
+                } else if (action.equals("reload")) {
+                    String result = plugin.getAPIClient().reloadPlugins();
+                    sender.sendMessage(ChatColor.GREEN + "✓ " + result);
+                } else {
+                    sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
+                }
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleLogs(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.admin")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        boolean tail = args.length >= 2 && args[1].equalsIgnoreCase("tail");
+        
+        sender.sendMessage(ChatColor.YELLOW + "Fetching logs...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                String logs = plugin.getAPIClient().getLogs();
+                
+                if (tail) {
+                    String[] lines = logs.split("\n");
+                    int start = Math.max(0, lines.length - 20);
+                    sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Logs (last 20)" + ChatColor.GOLD + " ==========");
+                    for (int i = start; i < lines.length; i++) {
+                        sender.sendMessage(ChatColor.GRAY + lines[i]);
+                    }
+                } else {
+                    sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Logs" + ChatColor.GOLD + " ==========");
+                    sender.sendMessage(ChatColor.GRAY + "Too long to display. Use /msc logs tail for last 20 lines");
+                }
+                
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleAudit(CommandSender sender) {
+        if (!sender.hasPermission("msc.admin")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.YELLOW + "Fetching audit logs...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                List<APIClient.AuditLog> logs = plugin.getAPIClient().getAuditLogs();
+                
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Audit Logs" + ChatColor.GOLD + " ==========");
+                
+                int count = Math.min(10, logs.size());
+                for (int i = 0; i < count; i++) {
+                    APIClient.AuditLog log = logs.get(i);
+                    sender.sendMessage(ChatColor.YELLOW + log.time.substring(11, 19) + ChatColor.GRAY + " | " +
+                                     ChatColor.AQUA + log.role + ChatColor.GRAY + " | " +
+                                     ChatColor.WHITE + log.action + ChatColor.GRAY + " | " +
+                                     log.detail);
+                }
+                sender.sendMessage(ChatColor.GRAY + "Showing " + count + " of " + logs.size() + " logs");
+                
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleSchedules(CommandSender sender) {
+        if (!sender.hasPermission("msc.admin")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        sender.sendMessage(ChatColor.YELLOW + "Fetching schedules...");
+        
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                List<APIClient.BackupSchedule> schedules = plugin.getAPIClient().listBackupSchedules();
+                
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Backup Schedules" + ChatColor.GOLD + " ==========");
+                
+                if (schedules.isEmpty()) {
+                    sender.sendMessage(ChatColor.YELLOW + "No schedules found");
+                } else {
+                    for (APIClient.BackupSchedule schedule : schedules) {
+                        String status = schedule.enabled ? ChatColor.GREEN + "✓" : ChatColor.RED + "✗";
+                        sender.sendMessage(status + ChatColor.YELLOW + " " + schedule.name);
+                        sender.sendMessage(ChatColor.GRAY + "  Cron: " + schedule.cronExpression + 
+                                         " | Max backups: " + schedule.maxBackups);
+                        if (schedule.lastRun != null) {
+                            sender.sendMessage(ChatColor.GRAY + "  Last run: " + schedule.lastRun);
+                        }
+                    }
+                }
+                
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+        
+        return true;
+    }
+    
+    private boolean handleReload(CommandSender sender) {
+        if (!sender.hasPermission("msc.reload")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+        
+        plugin.reloadConfig();
+        sender.sendMessage(ChatColor.GREEN + "✓ Configuration reloaded!");
+        
+        return true;
+    }
+    
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        List<String> completions = new ArrayList<>();
+        
+        if (args.length == 1) {
+            List<String> subCommands = Arrays.asList(
+                "help", "gui", "backup", "status", "players", "exec", "metrics", 
+                "server", "whitelist", "op", "plugins", "logs", "audit", "schedules", "reload"
+            );
+            
+            return subCommands.stream()
+                .filter(s -> s.startsWith(args[0].toLowerCase()))
+                .collect(Collectors.toList());
+        }
+        
+        if (args.length == 2) {
+            switch (args[0].toLowerCase()) {
+                case "backup":
+                    return Arrays.asList("list", "delete", "restore").stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+                case "server":
+                    return Arrays.asList("start", "stop").stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+                case "whitelist":
+                    return Arrays.asList("add", "remove", "list", "on", "off").stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+                case "op":
+                    return Arrays.asList("add", "remove").stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+                case "plugins":
+                    return Arrays.asList("list", "reload").stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+                case "logs":
+                    return Arrays.asList("tail").stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+        }
+        
+        return completions;
+    }
+}
