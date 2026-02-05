@@ -27,6 +27,7 @@ public class ServerControlGUI {
             ChatColor.GREEN + "Start Server",
             ChatColor.GRAY + "Start the Minecraft server",
             ChatColor.RED + "Requires admin permission",
+            "",
             ChatColor.YELLOW + "Click to start"));
         
         // サーバー停止
@@ -34,12 +35,14 @@ public class ServerControlGUI {
             ChatColor.RED + "Stop Server",
             ChatColor.GRAY + "Stop the Minecraft server",
             ChatColor.RED + "Requires admin permission",
+            "",
             ChatColor.YELLOW + "Click to stop"));
         
         // サーバーステータス
         inv.setItem(15, createItem(Material.COMPASS,
             ChatColor.YELLOW + "Server Status",
             ChatColor.GRAY + "View current server status",
+            "",
             ChatColor.YELLOW + "Click to view"));
         
         // 戻る

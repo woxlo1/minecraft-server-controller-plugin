@@ -26,7 +26,10 @@ public class GUIListener implements Listener {
         
         if (!title.contains("MSC") && !title.contains("Backup") && 
             !title.contains("Player") && !title.contains("Plugin") && 
-            !title.contains("Server")) {
+            !title.contains("Server") && !title.contains("Dashboard") &&
+            !title.contains("Schedule") && !title.contains("Console") &&
+            !title.contains("Audit") && !title.contains("Settings") &&
+            !title.contains("Status") && !title.contains("Control Panel")) {
             return;
         }
         
@@ -54,9 +57,17 @@ public class GUIListener implements Listener {
         if (title.contains("Control Panel")) {
             handleMainMenu(player, itemName);
         }
+        // ダッシュボード
+        else if (title.contains("Dashboard")) {
+            handleDashboard(player, itemName);
+        }
         // サーバーコントロール
         else if (title.contains("Server Control")) {
             handleServerControl(player, itemName);
+        }
+        // サーバーステータス
+        else if (title.contains("Server Status")) {
+            handleServerStatus(player, itemName);
         }
         // バックアップメニュー
         else if (title.contains("Backup Management")) {
@@ -66,6 +77,10 @@ public class GUIListener implements Listener {
         else if (title.contains("Backup List")) {
             handleBackupList(player, itemName, event.getClick());
         }
+        // バックアップスケジュール
+        else if (title.contains("Backup Schedules")) {
+            handleBackupSchedules(player, itemName, event.getClick());
+        }
         // プレイヤー管理
         else if (title.contains("Player Management")) {
             handlePlayerManagement(player, itemName);
@@ -74,10 +89,26 @@ public class GUIListener implements Listener {
         else if (title.contains("Plugin Management")) {
             handlePluginGUI(player, itemName);
         }
+        // コンソール
+        else if (title.contains("Console Commands")) {
+            handleConsole(player, itemName);
+        }
+        // 監査ログ
+        else if (title.contains("Audit Logs")) {
+            handleAuditLogs(player, itemName);
+        }
+        // 設定
+        else if (title.contains("MSC Settings")) {
+            handleSettings(player, itemName);
+        }
     }
     
     private void handleMainMenu(Player player, String itemName) {
         switch (itemName) {
+            case "★ Dashboard":
+                new DashboardGUI(plugin).open(player);
+                break;
+                
             case "Server Control":
                 new ServerControlGUI(plugin).open(player);
                 break;
@@ -98,9 +129,12 @@ public class GUIListener implements Listener {
                 new PluginGUI(plugin).open(player);
                 break;
                 
+            case "★ Console Commands":
+                new ConsoleGUI(plugin).open(player);
+                break;
+                
             case "Server Status":
-                player.closeInventory();
-                player.performCommand("msc status");
+                new ServerStatusGUI(plugin).open(player);
                 break;
                 
             case "Server Metrics":
@@ -118,36 +152,82 @@ public class GUIListener implements Listener {
                 player.performCommand("msc logs tail");
                 break;
                 
-            case "Audit Logs":
+            case "★ Audit Logs":
                 if (!player.hasPermission("msc.admin")) {
                     player.sendMessage(ChatColor.RED + "You don't have permission!");
                     return;
                 }
-                player.closeInventory();
-                player.performCommand("msc audit");
+                new AuditLogGUI(plugin).open(player);
                 break;
                 
-            case "Backup Schedules":
+            case "★ Backup Schedules":
                 if (!player.hasPermission("msc.admin")) {
                     player.sendMessage(ChatColor.RED + "You don't have permission!");
                     return;
                 }
-                player.closeInventory();
-                player.performCommand("msc schedules");
+                new BackupScheduleGUI(plugin).open(player);
                 break;
                 
-            case "Reload Config":
+            case "★ Settings":
                 if (!player.hasPermission("msc.reload")) {
                     player.sendMessage(ChatColor.RED + "You don't have permission!");
                     return;
                 }
-                player.closeInventory();
-                plugin.reloadConfig();
-                player.sendMessage(ChatColor.GREEN + "✓ Configuration reloaded!");
+                new SettingsGUI(plugin).open(player);
                 break;
                 
             case "Close":
                 player.closeInventory();
+                break;
+        }
+    }
+    
+    private void handleDashboard(Player player, String itemName) {
+        switch (itemName) {
+            case "Server Status":
+                new ServerStatusGUI(plugin).open(player);
+                break;
+                
+            case "Online Players":
+                new PlayerManagementGUI(plugin).open(player);
+                break;
+                
+            case "Memory Usage":
+                player.closeInventory();
+                player.performCommand("msc metrics");
+                break;
+                
+            case "Latest Backup":
+            case "No Backups":
+                new BackupGUI(plugin).open(player);
+                break;
+                
+            case "Backup Schedules":
+                new BackupScheduleGUI(plugin).open(player);
+                break;
+                
+            case "Server Control":
+                new ServerControlGUI(plugin).open(player);
+                break;
+                
+            case "Backup Management":
+                new BackupGUI(plugin).open(player);
+                break;
+                
+            case "Plugin Management":
+                if (!player.hasPermission("msc.admin")) {
+                    player.sendMessage(ChatColor.RED + "You don't have permission!");
+                    return;
+                }
+                new PluginGUI(plugin).open(player);
+                break;
+                
+            case "Refresh Dashboard":
+                new DashboardGUI(plugin).open(player);
+                break;
+                
+            case "Main Menu":
+                new MainMenuGUI(plugin).open(player);
                 break;
         }
     }
@@ -186,8 +266,19 @@ public class GUIListener implements Listener {
                 break;
                 
             case "Server Status":
-                player.closeInventory();
-                player.performCommand("msc status");
+                new ServerStatusGUI(plugin).open(player);
+                break;
+                
+            case "Back":
+                new MainMenuGUI(plugin).open(player);
+                break;
+        }
+    }
+    
+    private void handleServerStatus(Player player, String itemName) {
+        switch (itemName) {
+            case "Refresh":
+                new ServerStatusGUI(plugin).open(player);
                 break;
                 
             case "Back":
@@ -268,8 +359,7 @@ public class GUIListener implements Listener {
                     player.sendMessage(ChatColor.RED + "You don't have permission!");
                     return;
                 }
-                player.closeInventory();
-                player.performCommand("msc schedules");
+                new BackupScheduleGUI(plugin).open(player);
                 break;
                 
             case "Back":
@@ -325,6 +415,112 @@ public class GUIListener implements Listener {
                     player.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
                 }
             });
+        }
+    }
+    
+    private void handleBackupSchedules(Player player, String itemName, ClickType clickType) {
+        if (itemName.equals("Cron Format Help")) {
+            return;
+        }
+        
+        if (itemName.equals("Back")) {
+            new MainMenuGUI(plugin).open(player);
+            return;
+        }
+        
+        player.closeInventory();
+        player.sendMessage(ChatColor.YELLOW + "Schedule management: " + itemName);
+        player.sendMessage(ChatColor.GRAY + "Use commands:");
+        player.sendMessage(ChatColor.WHITE + "/msc schedule toggle <id>");
+        player.sendMessage(ChatColor.WHITE + "/msc schedule delete <id>");
+    }
+    
+    private void handleConsole(Player player, String itemName) {
+        if (itemName.equals("Back")) {
+            new MainMenuGUI(plugin).open(player);
+            return;
+        }
+        
+        if (itemName.equals("Custom Command")) {
+            player.closeInventory();
+            player.sendMessage(ChatColor.YELLOW + "Use: /msc exec <command>");
+            return;
+        }
+        
+        // コマンドショートカット
+        player.closeInventory();
+        
+        String command = null;
+        switch (itemName) {
+            case "say Hello":
+                command = "say Hello from MSC!";
+                break;
+            case "tp @a ~ ~ ~":
+                command = "tp @a ~ ~ ~";
+                break;
+            case "time set day":
+                command = "time set day";
+                break;
+            case "weather clear":
+                command = "weather clear";
+                break;
+            case "give @a minecraft:diamond 64":
+                command = "give @a minecraft:diamond 64";
+                break;
+            case "difficulty peaceful":
+                command = "difficulty peaceful";
+                break;
+            case "difficulty hard":
+                command = "difficulty hard";
+                break;
+        }
+        
+        if (command != null) {
+            new ConsoleGUI(plugin).executeCommand(player, command);
+        }
+    }
+    
+    private void handleAuditLogs(Player player, String itemName) {
+        switch (itemName) {
+            case "Refresh":
+                new AuditLogGUI(plugin).open(player);
+                break;
+                
+            case "Back":
+                new MainMenuGUI(plugin).open(player);
+                break;
+        }
+    }
+    
+    private void handleSettings(Player player, String itemName) {
+        switch (itemName) {
+            case "Debug Mode":
+                new SettingsGUI(plugin).toggleDebugMode(player);
+                break;
+                
+            case "Reload Configuration":
+                new SettingsGUI(plugin).reloadConfig(player);
+                break;
+                
+            case "API URL":
+            case "API Key":
+            case "Request Timeout":
+            case "Configuration File":
+                player.sendMessage(ChatColor.YELLOW + "Use commands to change this setting");
+                player.sendMessage(ChatColor.GRAY + "See item description for details");
+                break;
+                
+            case "Reset to Defaults":
+                player.sendMessage(ChatColor.RED + "Use: /msc config reset");
+                break;
+                
+            case "Backup/Restore Config":
+                player.sendMessage(ChatColor.YELLOW + "Use: /msc config backup or /msc config restore");
+                break;
+                
+            case "Back":
+                new MainMenuGUI(plugin).open(player);
+                break;
         }
     }
 }

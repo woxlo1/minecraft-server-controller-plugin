@@ -26,6 +26,7 @@ public class PlayerManagementGUI {
         inv.setItem(10, createItem(Material.PAPER,
             ChatColor.WHITE + "Whitelist Management",
             ChatColor.GRAY + "Add, remove, list whitelist",
+            "",
             ChatColor.YELLOW + "Use: /msc whitelist"));
         
         // OP管理
@@ -34,6 +35,7 @@ public class PlayerManagementGUI {
                 ChatColor.GOLD + "OP Management",
                 ChatColor.GRAY + "Add or remove OP status",
                 ChatColor.RED + "Admin only",
+                "",
                 ChatColor.YELLOW + "Use: /msc op"));
         }
         
@@ -41,6 +43,7 @@ public class PlayerManagementGUI {
         inv.setItem(14, createItem(Material.EMERALD,
             ChatColor.GREEN + "Online Players",
             ChatColor.GRAY + "View online players",
+            "",
             ChatColor.YELLOW + "Click to view"));
         
         // 戻る

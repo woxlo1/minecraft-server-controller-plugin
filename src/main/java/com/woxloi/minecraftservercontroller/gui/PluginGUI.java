@@ -51,6 +51,7 @@ public class PluginGUI {
                         ChatColor.RED + "Reload Plugins",
                         ChatColor.GRAY + "Reload all plugins",
                         ChatColor.RED + "WARNING: May cause issues",
+                        "",
                         ChatColor.YELLOW + "Click to reload"));
                     
                     // 戻る

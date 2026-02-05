@@ -29,12 +29,14 @@ public class BackupGUI {
         inv.setItem(10, createItem(Material.CHEST,
             ChatColor.GREEN + "Create New Backup",
             ChatColor.GRAY + "Create a manual backup",
+            "",
             ChatColor.YELLOW + "Click to create"));
         
         // バックアップ一覧を表示
         inv.setItem(13, createItem(Material.ENDER_CHEST,
             ChatColor.YELLOW + "List Backups",
             ChatColor.GRAY + "View all backups",
+            "",
             ChatColor.YELLOW + "Click to view"));
         
         // スケジュール管理
@@ -42,7 +44,9 @@ public class BackupGUI {
             inv.setItem(16, createItem(Material.REPEATER,
                 ChatColor.BLUE + "Backup Schedules",
                 ChatColor.GRAY + "Manage automatic backups",
-                ChatColor.RED + "Admin only"));
+                ChatColor.RED + "Admin only",
+                "",
+                ChatColor.YELLOW + "Click to open"));
         }
         
         // 戻る
