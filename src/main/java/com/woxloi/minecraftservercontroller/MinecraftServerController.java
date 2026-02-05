@@ -20,7 +20,9 @@ public class MinecraftServerController extends JavaPlugin {
         // API クライアントの初期化
         String apiUrl = getConfig().getString("api.url", "http://localhost:8000");
         String apiKey = getConfig().getString("api.key", "");
-        
+
+        apiClient = new APIClient(apiUrl, apiKey, getLogger(), debug);
+
         if (apiKey.isEmpty()) {
             getLogger().warning("API Key is not set in config.yml!");
             getLogger().warning("Please set api.key in config.yml and reload the plugin.");
