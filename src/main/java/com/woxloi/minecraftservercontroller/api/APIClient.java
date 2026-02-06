@@ -356,6 +356,33 @@ public class APIClient {
     }
 
     /**
+     * バックアップスケジュールを作成
+     */
+    public BackupSchedule createBackupSchedule(String name, String cronExpression, int maxBackups) throws IOException {
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("name", name);
+        requestBody.addProperty("cron_expression", cronExpression);
+        requestBody.addProperty("max_backups", maxBackups);
+
+        String response = post("/backup/schedules", gson.toJson(requestBody));
+        JsonObject json = gson.fromJson(response, JsonObject.class);
+
+        int id = json.get("id").getAsInt();
+        String createdName = json.get("name").getAsString();
+        boolean enabled = json.get("enabled").getAsBoolean();
+
+        return new BackupSchedule(
+                id,
+                createdName,
+                cronExpression,
+                enabled,
+                maxBackups,
+                null, // created がレスポンスに無いなら
+                null  // lastRun
+        );
+    }
+
+    /**
      * バックアップを削除
      */
     public String deleteBackup(String filename) throws IOException {

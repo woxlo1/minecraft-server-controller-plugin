@@ -108,7 +108,7 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/msc plugins [list|reload]" + ChatColor.WHITE + " - Plugin management");
         sender.sendMessage(ChatColor.YELLOW + "/msc logs [tail]" + ChatColor.WHITE + " - View server logs");
         sender.sendMessage(ChatColor.YELLOW + "/msc audit" + ChatColor.WHITE + " - View audit logs");
-        sender.sendMessage(ChatColor.YELLOW + "/msc schedule [list|toggle|delete]" + ChatColor.WHITE + " - Backup schedules");
+        sender.sendMessage(ChatColor.YELLOW + "/msc schedule [create|list|toggle|delete]" + ChatColor.WHITE + " - Backup schedules");
         sender.sendMessage(ChatColor.YELLOW + "/msc metrics" + ChatColor.WHITE + " - Server metrics");
         sender.sendMessage(ChatColor.YELLOW + "/msc exec <command>" + ChatColor.WHITE + " - Execute command");
         sender.sendMessage(ChatColor.YELLOW + "/msc reload" + ChatColor.WHITE + " - Reload config");
@@ -672,11 +672,17 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // サブコマンド処理: /msc schedule [list|toggle|delete] [id]
+        // サブコマンド処理: /msc schedule [list|create|toggle|delete] [id]
         if (args.length >= 2) {
             String action = args[1].toLowerCase();
 
             switch (action) {
+                case "create":
+                    if (args.length < 3) {
+                        sender.sendMessage(ChatColor.RED + "Usage: /msc schedule create <name> <min> <hour> <day> <month> <weekday> <max>");
+                    }
+                    return handleScheduleCreate(sender, args);
+
                 case "toggle":
                     if (args.length < 3) {
                         sender.sendMessage(ChatColor.RED + "Usage: /msc schedule toggle <id>");
@@ -697,7 +703,7 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
 
                 default:
                     sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /msc schedule [list|toggle|delete]");
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /msc schedule [create|list|toggle|delete]");
                     return true;
             }
         }
@@ -727,6 +733,50 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(ChatColor.GRAY + "Use: /msc schedule toggle <id> to enable/disable");
                     sender.sendMessage(ChatColor.GRAY + "Use: /msc schedule delete <id> to delete");
                 }
+
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+            }
+        });
+
+        return true;
+    }
+
+    private boolean handleScheduleCreate(CommandSender sender, String[] args) {
+
+        if (args.length < 10) {
+            sender.sendMessage(ChatColor.RED +
+                    "Usage: /msc schedule create <name> <min> <hour> <day> <month> <weekday> <max>");
+            return true;
+        }
+
+        String name = args[2];
+
+        int max;
+        try {
+            max = Integer.parseInt(args[args.length - 1]);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(ChatColor.RED + "Max backups must be a number!");
+            return true;
+        }
+
+        // cronを結合（ここが重要）
+        String cron = String.join(" ",
+                Arrays.copyOfRange(args, 3, args.length - 1));
+
+        sender.sendMessage(ChatColor.YELLOW + "Creating schedule...");
+
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+
+                APIClient.BackupSchedule result =
+                        plugin.getAPIClient().createBackupSchedule(name, cron, max);
+
+                sender.sendMessage(ChatColor.GREEN + "✓ Schedule created!");
+                sender.sendMessage(ChatColor.YELLOW + "ID: " + result.id);
+                sender.sendMessage(ChatColor.GRAY + "Name: " + result.name);
+                sender.sendMessage(ChatColor.GRAY + "Status: " +
+                        (result.enabled ? ChatColor.GREEN + "Enabled" : ChatColor.RED + "Disabled"));
 
             } catch (Exception e) {
                 sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
@@ -835,7 +885,7 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                             .filter(s -> s.startsWith(args[1].toLowerCase()))
                             .collect(Collectors.toList());
                 case "schedule":
-                    return Arrays.asList("list", "toggle", "delete").stream()
+                    return Arrays.asList("list", "create", "toggle", "delete").stream()
                             .filter(s -> s.startsWith(args[1].toLowerCase()))
                             .collect(Collectors.toList());
             }
