@@ -81,7 +81,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
             case "audit":
                 return handleAudit(sender);
 
-            case "schedules":
             case "schedule":
                 return handleSchedules(sender, args);
 
@@ -836,7 +835,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                             .filter(s -> s.startsWith(args[1].toLowerCase()))
                             .collect(Collectors.toList());
                 case "schedule":
-                case "schedules":
                     return Arrays.asList("list", "toggle", "delete").stream()
                             .filter(s -> s.startsWith(args[1].toLowerCase()))
                             .collect(Collectors.toList());
