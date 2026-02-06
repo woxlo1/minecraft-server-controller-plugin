@@ -11,10 +11,13 @@ public class MinecraftServerController extends JavaPlugin {
     private static MinecraftServerController instance;
     private APIClient apiClient;
     private NotificationManager notificationManager;
+    private long serverStartNano;
 
     @Override
     public void onEnable() {
         instance = this;
+
+        serverStartNano = System.nanoTime();
 
         // コンフィグの保存
         saveDefaultConfig();
@@ -52,6 +55,10 @@ public class MinecraftServerController extends JavaPlugin {
     @Override
     public void onDisable() {
         getLogger().info("MinecraftServerController has been disabled!");
+    }
+
+    public long getUptimeMillis() {
+        return (System.nanoTime() - serverStartNano) / 1_000_000;
     }
 
     public static MinecraftServerController getInstance() {
