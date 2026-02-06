@@ -745,8 +745,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
     private boolean handleScheduleCreate(CommandSender sender, String[] args) {
 
         if (args.length < 10) {
-            sender.sendMessage(ChatColor.RED +
-                    "Usage: /msc schedule create <name> <min> <hour> <day> <month> <weekday> <max>");
             return true;
         }
 
