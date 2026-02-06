@@ -2,8 +2,8 @@
 
 # API Settings
 api:
-  # API Base URL (e.g., http://localhost:8000/docs or http://your-server-ip:8000/docs)
-  url: "http://localhost:8000/docs"
+  # API Base URL (e.g., http://localhost:8000/ or http://your-server-ip:8000/)
+  url: "http://localhost:8000/"
 
   # API Key (get from /register endpoint or use ROOT_API_KEY)
   # Leave empty and it will show a warning in console
