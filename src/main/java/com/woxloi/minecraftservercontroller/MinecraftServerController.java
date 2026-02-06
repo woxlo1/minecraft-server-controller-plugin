@@ -1,5 +1,6 @@
 package com.woxloi.minecraftservercontroller;
 
+import com.woxloi.minecraftservercontroller.gui.EnhancedGUIListener;
 import org.bukkit.plugin.java.JavaPlugin;
 import com.woxloi.minecraftservercontroller.commands.MSCCommand;
 import com.woxloi.minecraftservercontroller.api.APIClient;
@@ -46,6 +47,7 @@ public class MinecraftServerController extends JavaPlugin {
 
         // GUIリスナーの登録
         getServer().getPluginManager().registerEvents(new GUIListener(this), this);
+        getServer().getPluginManager().registerEvents(new EnhancedGUIListener(this), this);
 
         getLogger().info("MinecraftServerController has been enabled!");
         getLogger().info("API URL: " + apiUrl);

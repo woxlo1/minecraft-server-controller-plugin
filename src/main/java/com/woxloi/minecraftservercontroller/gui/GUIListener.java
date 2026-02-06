@@ -189,7 +189,7 @@ public class GUIListener implements Listener {
                 break;
                 
             case "Online Players":
-                new PlayerManagementGUI(plugin).open(player);
+                new OnlinePlayersGUI(plugin).open(player);
                 break;
                 
             case "Memory Usage":
