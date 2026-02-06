@@ -300,7 +300,7 @@ public class APIClient {
      * サーバーステータス取得
      */
     public ServerStatus getServerStatus() throws IOException {
-        String response = get("/server/status");
+        String response = get("/status");
         JsonObject json = gson.fromJson(response, JsonObject.class);
 
         String status = json.get("status").getAsString();
@@ -313,7 +313,7 @@ public class APIClient {
      * バックアップ作成
      */
     public BackupResult createBackup() throws IOException {
-        String response = post("/backups", null);
+        String response = post("/backup", null);
         JsonObject json = gson.fromJson(response, JsonObject.class);
 
         String filename = json.get("backup").getAsString();
@@ -331,11 +331,11 @@ public class APIClient {
         List<BackupInfo> result = new ArrayList<>();
         for (JsonElement elem : backups) {
             JsonObject backup = elem.getAsJsonObject();
-            String filename = backup.get("filename").getAsString();
+            String filename = backup.get("name").getAsString();
             double sizeMb = backup.get("size_mb").getAsDouble();
-            String modified = backup.get("modified").getAsString();
+            String created = backup.get("created").getAsString();
 
-            result.add(new BackupInfo(filename, sizeMb, modified));
+            result.add(new BackupInfo(filename, sizeMb, created));
         }
 
         return result;
