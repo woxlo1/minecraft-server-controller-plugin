@@ -744,7 +744,7 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
 
     private boolean handleScheduleCreate(CommandSender sender, String[] args) {
 
-        if (args.length < 10) {
+        if (args.length < 9) {
             return true;
         }
 
