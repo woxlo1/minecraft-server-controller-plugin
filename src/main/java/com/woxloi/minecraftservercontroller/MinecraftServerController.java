@@ -5,6 +5,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.woxloi.minecraftservercontroller.commands.MSCCommand;
 import com.woxloi.minecraftservercontroller.api.APIClient;
 import com.woxloi.minecraftservercontroller.gui.GUIListener;
+import com.woxloi.minecraftservercontroller.utils.APIHealthChecker;
 import com.woxloi.minecraftservercontroller.utils.NotificationManager;
 
 public class MinecraftServerController extends JavaPlugin {
@@ -38,6 +39,9 @@ public class MinecraftServerController extends JavaPlugin {
 
         // API クライアントの初期化（新しいコンストラクタを使用）
         apiClient = new APIClient(apiUrl, apiKey, getLogger(), debug);
+
+        // ヘルスチェック開始（5分ごと）
+        new APIHealthChecker(this).runTaskTimerAsynchronously(this, 20L * 60 * 5, 20L * 60 * 5);
 
         // 通知マネージャーの初期化
         notificationManager = new NotificationManager(this);

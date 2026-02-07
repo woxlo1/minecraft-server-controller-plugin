@@ -736,6 +736,7 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
 
             } catch (Exception e) {
                 sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+
             }
         });
 
