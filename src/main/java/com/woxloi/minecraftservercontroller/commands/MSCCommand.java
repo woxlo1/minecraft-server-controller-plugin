@@ -3,16 +3,18 @@ package com.woxloi.minecraftservercontroller.commands;
 import com.woxloi.minecraftservercontroller.MinecraftServerController;
 import com.woxloi.minecraftservercontroller.api.APIClient;
 import com.woxloi.minecraftservercontroller.gui.MainMenuGUI;
+import com.woxloi.minecraftservercontroller.utils.*;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.io.File;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class MSCCommand implements CommandExecutor, TabCompleter {
@@ -87,6 +89,28 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
             case "reload":
                 return handleReload(sender);
 
+            // =============================
+            // 新機能のコマンド（v1.3.9）
+            // =============================
+
+            case "performance":
+            case "perf":
+                return handlePerformance(sender, args);
+
+            case "world":
+            case "worlds":
+                return handleWorld(sender, args);
+
+            case "chat":
+                return handleChat(sender, args);
+
+            case "template":
+            case "cmd":
+                return handleTemplate(sender, args);
+
+            case "stats":
+                return handleStats(sender, args);
+
             default:
                 sender.sendMessage(ChatColor.RED + "Unknown subcommand: " + subCommand);
                 sender.sendMessage(ChatColor.YELLOW + "Use /msc help for available commands");
@@ -112,7 +136,19 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/msc metrics" + ChatColor.WHITE + " - Server metrics");
         sender.sendMessage(ChatColor.YELLOW + "/msc exec <command>" + ChatColor.WHITE + " - Execute command");
         sender.sendMessage(ChatColor.YELLOW + "/msc reload" + ChatColor.WHITE + " - Reload config");
+
+        sender.sendMessage("");
+        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.AQUA + "New in v1.3.9" + ChatColor.GOLD + " ==========");
+        sender.sendMessage(ChatColor.YELLOW + "/msc performance" + ChatColor.WHITE + " - Performance monitoring");
+        sender.sendMessage(ChatColor.YELLOW + "/msc world [list|load|unload|backup]" + ChatColor.WHITE + " - World management");
+        sender.sendMessage(ChatColor.YELLOW + "/msc chat [search|player]" + ChatColor.WHITE + " - Chat log viewer");
+        sender.sendMessage(ChatColor.YELLOW + "/msc template [add|list|use]" + ChatColor.WHITE + " - Command templates");
+        sender.sendMessage(ChatColor.YELLOW + "/msc stats [player]" + ChatColor.WHITE + " - Player statistics");
     }
+
+    // =============================
+    // 既存のハンドラ（省略 - ドキュメント1,2,3,4と同じ）
+    // =============================
 
     private boolean handleGUI(CommandSender sender) {
         if (!(sender instanceof Player)) {
@@ -162,14 +198,12 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                 APIClient.BackupResult result = plugin.getAPIClient().createBackup();
                 sender.sendMessage(ChatColor.GREEN + "✓ Backup created: " + ChatColor.WHITE + result.filename);
 
-                // 通知を送信（NotificationManagerがある場合）
                 if (plugin.getNotificationManager() != null) {
                     plugin.getNotificationManager().notifyBackupCreated(result.filename);
                 }
             } catch (Exception e) {
                 sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
 
-                // エラー通知
                 if (plugin.getNotificationManager() != null) {
                     plugin.getNotificationManager().notifyError("Backup creation failed: " + e.getMessage());
                 }
@@ -225,7 +259,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                 plugin.getAPIClient().deleteBackup(filename);
                 sender.sendMessage(ChatColor.GREEN + "✓ Backup deleted: " + ChatColor.WHITE + filename);
 
-                // 通知を送信
                 if (plugin.getNotificationManager() != null) {
                     plugin.getNotificationManager().notifyBackupDeleted(filename);
                 }
@@ -252,7 +285,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ChatColor.GREEN + "✓ Backup restored: " + ChatColor.WHITE + result.backup);
                 sender.sendMessage(ChatColor.GRAY + "Pre-restore backup: " + result.preRestoreBackup);
 
-                // 通知を送信
                 if (plugin.getNotificationManager() != null) {
                     plugin.getNotificationManager().notifyBackupRestored(result.backup);
                 }
@@ -375,7 +407,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ChatColor.YELLOW + "Usage: " + ChatColor.WHITE +
                         String.format("%.1f%%", metrics.percent));
 
-                // メモリ警告
                 if (plugin.getNotificationManager() != null) {
                     if (metrics.percent >= 95) {
                         plugin.getNotificationManager().notifyCriticalMemoryUsage(metrics.percent);
@@ -409,7 +440,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
             try {
                 String result;
                 if (action.equals("start")) {
-                    // 通知を送信
                     if (plugin.getNotificationManager() != null) {
                         plugin.getNotificationManager().notifyServerStarting();
                     }
@@ -417,7 +447,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                     result = plugin.getAPIClient().startServer();
                     sender.sendMessage(ChatColor.GREEN + "✓ Server starting: " + result);
                 } else if (action.equals("stop")) {
-                    // 通知を送信
                     if (plugin.getNotificationManager() != null) {
                         plugin.getNotificationManager().notifyServerStopping();
                     }
@@ -460,7 +489,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                         String addResult = plugin.getAPIClient().whitelistAdd(args[2]);
                         sender.sendMessage(ChatColor.GREEN + "✓ " + addResult);
 
-                        // 通知を送信
                         if (plugin.getNotificationManager() != null) {
                             plugin.getNotificationManager().notifyWhitelistAdded(args[2]);
                         }
@@ -474,7 +502,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                         String removeResult = plugin.getAPIClient().whitelistRemove(args[2]);
                         sender.sendMessage(ChatColor.GREEN + "✓ " + removeResult);
 
-                        // 通知を送信
                         if (plugin.getNotificationManager() != null) {
                             plugin.getNotificationManager().notifyWhitelistRemoved(args[2]);
                         }
@@ -532,14 +559,12 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                 if (action.equals("add")) {
                     result = plugin.getAPIClient().opAdd(player);
 
-                    // 通知を送信
                     if (plugin.getNotificationManager() != null) {
                         plugin.getNotificationManager().notifyOpGranted(player);
                     }
                 } else if (action.equals("remove")) {
                     result = plugin.getAPIClient().opRemove(player);
 
-                    // 通知を送信
                     if (plugin.getNotificationManager() != null) {
                         plugin.getNotificationManager().notifyOpRevoked(player);
                     }
@@ -585,7 +610,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                     String result = plugin.getAPIClient().reloadPlugins();
                     sender.sendMessage(ChatColor.GREEN + "✓ " + result);
 
-                    // 通知を送信
                     if (plugin.getNotificationManager() != null) {
                         plugin.getNotificationManager().notifyPluginReloaded();
                     }
@@ -672,7 +696,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // サブコマンド処理: /msc schedule [list|create|toggle|delete] [id]
         if (args.length >= 2) {
             String action = args[1].toLowerCase();
 
@@ -698,7 +721,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                     return handleScheduleDelete(sender, args[2]);
 
                 case "list":
-                    // 下の一覧表示に続く
                     break;
 
                 default:
@@ -708,7 +730,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        // スケジュール一覧表示
         sender.sendMessage(ChatColor.YELLOW + "Fetching schedules...");
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -759,7 +780,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // cronを結合（ここが重要）
         String cron = String.join(" ",
                 Arrays.copyOfRange(args, 3, args.length - 1));
 
@@ -842,6 +862,331 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    // =============================
+    // 新機能のハンドラ（v1.3.9）
+    // =============================
+
+    private boolean handlePerformance(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.performance")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+
+        if (sender instanceof Player) {
+            new com.woxloi.minecraftservercontroller.gui.PerformanceMonitorGUI(plugin).open((Player) sender);
+            return true;
+        }
+
+        // コンソールの場合
+        PerformanceMonitor.CurrentPerformance perf = plugin.getPerformanceMonitor().getCurrentPerformance();
+        if (perf == null) {
+            sender.sendMessage(ChatColor.RED + "Failed to get performance data");
+            return true;
+        }
+
+        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Performance" + ChatColor.GOLD + " ==========");
+        sender.sendMessage(ChatColor.YELLOW + "TPS (1m): " + ChatColor.WHITE + String.format("%.2f", perf.tps1m));
+        sender.sendMessage(ChatColor.YELLOW + "TPS (5m): " + ChatColor.WHITE + String.format("%.2f", perf.tps5m));
+        sender.sendMessage(ChatColor.YELLOW + "TPS (15m): " + ChatColor.WHITE + String.format("%.2f", perf.tps15m));
+        sender.sendMessage(ChatColor.YELLOW + "Memory: " + ChatColor.WHITE +
+                String.format("%d/%d MB (%.1f%%)", perf.memoryUsed, perf.memoryTotal, perf.getMemoryPercent()));
+        sender.sendMessage(ChatColor.YELLOW + "Entities: " + ChatColor.WHITE + perf.entities);
+        sender.sendMessage(ChatColor.YELLOW + "Chunks: " + ChatColor.WHITE + perf.chunks);
+        sender.sendMessage(ChatColor.YELLOW + "Players: " + ChatColor.WHITE + perf.players);
+
+        return true;
+    }
+
+    private boolean handleWorld(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.world")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+
+        if (args.length < 2) {
+            // GUI表示（プレイヤーのみ）
+            if (sender instanceof Player) {
+                new com.woxloi.minecraftservercontroller.gui.WorldManagementGUI(plugin).open((Player) sender);
+                return true;
+            } else {
+                sender.sendMessage(ChatColor.RED + "Usage: /msc world [list|load|unload|backup] <name>");
+                return true;
+            }
+        }
+
+        String action = args[1].toLowerCase();
+
+        switch (action) {
+            case "list":
+                List<WorldManager.WorldInfo> worlds = plugin.getWorldManager().getAvailableWorlds();
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Worlds" + ChatColor.GOLD + " ==========");
+                for (WorldManager.WorldInfo world : worlds) {
+                    String status = world.loaded ? ChatColor.GREEN + "✓" : ChatColor.RED + "✗";
+                    sender.sendMessage(status + ChatColor.YELLOW + " " + world.name +
+                            ChatColor.GRAY + " (" + world.sizeMB + " MB, " + world.environment + ")");
+                }
+                break;
+
+            case "load":
+                if (args.length < 3) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /msc world load <name>");
+                    return true;
+                }
+                String loadWorld = args[2];
+                sender.sendMessage(ChatColor.YELLOW + "Loading world: " + loadWorld);
+                boolean loaded = plugin.getWorldManager().loadWorld(loadWorld);
+                if (loaded) {
+                    sender.sendMessage(ChatColor.GREEN + "✓ World loaded: " + loadWorld);
+                } else {
+                    sender.sendMessage(ChatColor.RED + "✗ Failed to load world");
+                }
+                break;
+
+            case "unload":
+                if (args.length < 3) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /msc world unload <name>");
+                    return true;
+                }
+                String unloadWorld = args[2];
+                sender.sendMessage(ChatColor.YELLOW + "Unloading world: " + unloadWorld);
+                boolean unloaded = plugin.getWorldManager().unloadWorld(unloadWorld, true);
+                if (unloaded) {
+                    sender.sendMessage(ChatColor.GREEN + "✓ World unloaded: " + unloadWorld);
+                } else {
+                    sender.sendMessage(ChatColor.RED + "✗ Failed to unload world");
+                }
+                break;
+
+            case "backup":
+                if (args.length < 3) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /msc world backup <name>");
+                    return true;
+                }
+                String backupWorld = args[2];
+                sender.sendMessage(ChatColor.YELLOW + "Backing up world: " + backupWorld);
+
+                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                    try {
+                        File backup = plugin.getWorldManager().backupWorld(backupWorld);
+                        sender.sendMessage(ChatColor.GREEN + "✓ World backed up: " + backup.getName());
+                    } catch (Exception e) {
+                        sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+                    }
+                });
+                break;
+
+            default:
+                sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
+                sender.sendMessage(ChatColor.YELLOW + "Usage: /msc world [list|load|unload|backup]");
+        }
+
+        return true;
+    }
+
+    private boolean handleChat(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("msc.chat")) {
+            sender.sendMessage(ChatColor.RED + "You don't have permission!");
+            return true;
+        }
+
+        if (args.length < 2) {
+            // GUI表示（プレイヤーのみ）
+            if (sender instanceof Player) {
+                new com.woxloi.minecraftservercontroller.gui.ChatLogViewerGUI(plugin).open((Player) sender);
+                return true;
+            } else {
+                sender.sendMessage(ChatColor.RED + "Usage: /msc chat [search|player] <term>");
+                return true;
+            }
+        }
+
+        String action = args[1].toLowerCase();
+
+        switch (action) {
+            case "search":
+                if (args.length < 3) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /msc chat search <keyword>");
+                    return true;
+                }
+                String keyword = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+                List<ChatLogManager.ChatMessage> results = plugin.getChatLogManager().searchMessages(keyword, 20);
+
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Chat Search: " + keyword + ChatColor.GOLD + " ==========");
+                if (results.isEmpty()) {
+                    sender.sendMessage(ChatColor.YELLOW + "No messages found");
+                } else {
+                    for (ChatLogManager.ChatMessage msg : results) {
+                        sender.sendMessage(ChatColor.GRAY + msg.getFormattedTimestamp() + ChatColor.YELLOW + " [" + msg.playerName + "] " +
+                                ChatColor.WHITE + msg.message);
+                    }
+                    sender.sendMessage(ChatColor.GRAY + "Found " + results.size() + " messages");
+                }
+                break;
+
+            case "player":
+                if (args.length < 3) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /msc chat player <name>");
+                    return true;
+                }
+                String playerName = args[2];
+                Player target = Bukkit.getPlayer(playerName);
+                if (target == null) {
+                    sender.sendMessage(ChatColor.RED + "Player not found: " + playerName);
+                    return true;
+                }
+
+                List<ChatLogManager.ChatMessage> playerMsgs = plugin.getChatLogManager().getPlayerMessages(target.getUniqueId(), 20);
+
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Chat: " + playerName + ChatColor.GOLD + " ==========");
+                if (playerMsgs.isEmpty()) {
+                    sender.sendMessage(ChatColor.YELLOW + "No messages found");
+                } else {
+                    for (ChatLogManager.ChatMessage msg : playerMsgs) {
+                        sender.sendMessage(ChatColor.GRAY + msg.getFormattedTimestamp() + " " + ChatColor.WHITE + msg.message);
+                    }
+                    sender.sendMessage(ChatColor.GRAY + "Showing " + playerMsgs.size() + " messages");
+                }
+                break;
+
+            default:
+                sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
+                sender.sendMessage(ChatColor.YELLOW + "Usage: /msc chat [search|player]");
+        }
+
+        return true;
+    }
+
+    private boolean handleTemplate(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage(ChatColor.RED + "This command can only be used by players!");
+            return true;
+        }
+
+        Player player = (Player) sender;
+
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Usage: /msc template [add|list|use|remove] ...");
+            return true;
+        }
+
+        String action = args[1].toLowerCase();
+
+        switch (action) {
+            case "add":
+                if (args.length < 4) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /msc template add <name> <command>");
+                    return true;
+                }
+                String name = args[2];
+                String command = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+                plugin.getTemplateManager().addTemplate(player.getUniqueId(), name, command, "User template");
+                sender.sendMessage(ChatColor.GREEN + "✓ Template added: " + name);
+                break;
+
+            case "list":
+                List<CommandTemplateManager.CommandTemplate> templates =
+                        plugin.getTemplateManager().getTemplates(player.getUniqueId());
+
+                if (templates.isEmpty()) {
+                    sender.sendMessage(ChatColor.YELLOW + "No templates found");
+                } else {
+                    sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Templates" + ChatColor.GOLD + " ==========");
+                    for (CommandTemplateManager.CommandTemplate template : templates) {
+                        sender.sendMessage(ChatColor.YELLOW + "• " + template.name + ChatColor.GRAY + " - " +
+                                ChatColor.WHITE + template.command);
+                    }
+                }
+                break;
+
+            case "use":
+                if (args.length < 3) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /msc template use <name>");
+                    return true;
+                }
+                String templateName = args[2];
+                CommandTemplateManager.CommandTemplate template =
+                        plugin.getTemplateManager().getTemplate(player.getUniqueId(), templateName);
+
+                if (template == null) {
+                    sender.sendMessage(ChatColor.RED + "Template not found: " + templateName);
+                    return true;
+                }
+
+                if (template.hasPlaceholders()) {
+                    sender.sendMessage(ChatColor.YELLOW + "Template: " + template.command);
+                    sender.sendMessage(ChatColor.YELLOW + "Placeholders: " + template.getPlaceholders());
+                    sender.sendMessage(ChatColor.GRAY + "Use: /msc exec " + template.command);
+                } else {
+                    player.performCommand("msc exec " + template.command);
+                }
+                break;
+
+            case "remove":
+                if (args.length < 3) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /msc template remove <name>");
+                    return true;
+                }
+                String removeName = args[2];
+                boolean removed = plugin.getTemplateManager().removeTemplate(player.getUniqueId(), removeName);
+                if (removed) {
+                    sender.sendMessage(ChatColor.GREEN + "✓ Template removed: " + removeName);
+                } else {
+                    sender.sendMessage(ChatColor.RED + "Template not found: " + removeName);
+                }
+                break;
+
+            default:
+                sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
+        }
+
+        return true;
+    }
+
+    private boolean handleStats(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player) && args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Usage: /msc stats [player]");
+            return true;
+        }
+
+        Player target;
+        if (args.length >= 2) {
+            target = Bukkit.getPlayer(args[1]);
+            if (target == null) {
+                sender.sendMessage(ChatColor.RED + "Player not found: " + args[1]);
+                return true;
+            }
+
+            if (!sender.hasPermission("msc.admin") && sender != target) {
+                sender.sendMessage(ChatColor.RED + "You don't have permission to view other players' stats!");
+                return true;
+            }
+        } else {
+            target = (Player) sender;
+        }
+
+        PlayerActivityTracker.PlayerStats stats = plugin.getActivityTracker().getPlayerStats(target.getUniqueId());
+
+        if (stats == null) {
+            sender.sendMessage(ChatColor.YELLOW + "No statistics found for " + target.getName());
+            return true;
+        }
+
+        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + stats.playerName + "'s Stats" + ChatColor.GOLD + " ==========");
+        sender.sendMessage(ChatColor.YELLOW + "Total Playtime: " + ChatColor.WHITE + stats.getFormattedPlaytime());
+        sender.sendMessage(ChatColor.YELLOW + "Total Sessions: " + ChatColor.WHITE + stats.totalSessions);
+        sender.sendMessage(ChatColor.YELLOW + "First Join: " + ChatColor.WHITE + stats.firstJoin);
+        sender.sendMessage(ChatColor.YELLOW + "Last Join: " + ChatColor.WHITE + stats.lastJoin);
+
+        String recentActivity = plugin.getActivityTracker().getRecentActivity(target.getUniqueId(), 5);
+        if (!recentActivity.isEmpty()) {
+            sender.sendMessage("");
+            sender.sendMessage(ChatColor.GOLD + "Recent Activity:");
+            sender.sendMessage(ChatColor.GRAY + recentActivity);
+        }
+
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
@@ -849,7 +1194,8 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             List<String> subCommands = Arrays.asList(
                     "help", "gui", "backup", "status", "players", "exec", "metrics",
-                    "server", "whitelist", "op", "plugins", "logs", "audit", "schedule", "reload"
+                    "server", "whitelist", "op", "plugins", "logs", "audit", "schedule", "reload",
+                    "performance", "world", "chat", "template", "stats"
             );
 
             return subCommands.stream()
@@ -885,6 +1231,18 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                             .collect(Collectors.toList());
                 case "schedule":
                     return Arrays.asList("list", "create", "toggle", "delete").stream()
+                            .filter(s -> s.startsWith(args[1].toLowerCase()))
+                            .collect(Collectors.toList());
+                case "world":
+                    return Arrays.asList("list", "load", "unload", "backup").stream()
+                            .filter(s -> s.startsWith(args[1].toLowerCase()))
+                            .collect(Collectors.toList());
+                case "chat":
+                    return Arrays.asList("search", "player").stream()
+                            .filter(s -> s.startsWith(args[1].toLowerCase()))
+                            .collect(Collectors.toList());
+                case "template":
+                    return Arrays.asList("add", "list", "use", "remove").stream()
                             .filter(s -> s.startsWith(args[1].toLowerCase()))
                             .collect(Collectors.toList());
             }

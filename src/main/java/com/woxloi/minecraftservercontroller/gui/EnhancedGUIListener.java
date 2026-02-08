@@ -13,8 +13,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
 /**
- * 拡張GUIリスナー
- * バックアップスケジュールGUIとオンラインプレイヤーGUIのイベント処理
+ * 拡張GUIリスナー（修正版）
+ * BackupScheduleGUIのプレイヤー固有スロットマッピングに対応
  */
 public class EnhancedGUIListener implements Listener {
 
@@ -75,7 +75,7 @@ public class EnhancedGUIListener implements Listener {
      * バックアップスケジュールGUIのクリック処理
      */
     private void handleBackupSchedulesClick(Player player, String itemName, ClickType clickType, int slot, ItemStack clicked) {
-    BackupScheduleGUI gui = new BackupScheduleGUI(plugin);
+        BackupScheduleGUI gui = new BackupScheduleGUI(plugin);
 
         // 制御ボタン
         if (itemName.contains("Back") || itemName.contains("⬅")) {
@@ -121,7 +121,8 @@ public class EnhancedGUIListener implements Listener {
 
         // スケジュールアイテム（0-44スロット）
         if (slot >= 0 && slot < 45) {
-            int scheduleId = gui.getScheduleIdFromSlot(slot);
+            // ★修正：プレイヤー固有のスロットマッピングを使用
+            int scheduleId = gui.getScheduleIdFromSlot(player, slot);
 
             if (scheduleId == -1) {
                 player.sendMessage(ChatColor.RED + "Invalid schedule");
@@ -146,8 +147,7 @@ public class EnhancedGUIListener implements Listener {
                 player.sendMessage("");
 
             } else if (clickType.isShiftClick()) {
-
-                ItemMeta meta = clicked.getItemMeta();
+                ItemMeta itemMeta = clicked.getItemMeta();
 
                 // Shiftクリック: 詳細表示
                 player.sendMessage("");
@@ -155,8 +155,8 @@ public class EnhancedGUIListener implements Listener {
                 player.sendMessage(ChatColor.AQUA + "Schedule Details: " + ChatColor.WHITE + itemName);
                 player.sendMessage(ChatColor.GOLD + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-                if (meta.hasLore()) {
-                    for (String line : meta.getLore()) {
+                if (itemMeta.hasLore()) {
+                    for (String line : itemMeta.getLore()) {
                         player.sendMessage(line);
                     }
                 }

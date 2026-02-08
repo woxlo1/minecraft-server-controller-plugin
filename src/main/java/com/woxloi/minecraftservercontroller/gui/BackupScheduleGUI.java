@@ -14,22 +14,19 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 改善されたバックアップスケジュールGUI
- * - スケジュールの有効/無効切り替え
- * - スケジュール削除
- * - 詳細情報表示
- * - スケジュール作成ウィザード
+ * シングルトンパターンでスロットマッピングを一元管理
  */
 public class BackupScheduleGUI {
 
     private final MinecraftServerController plugin;
-    // スケジュールIDとインベントリスロットのマッピング
-    private final Map<Integer, Integer> slotToScheduleId = new HashMap<>();
+
+    // 静的マップで全インスタンス間でスロット情報を共有
+    private static final ConcurrentHashMap<String, Integer> playerSlotMap = new ConcurrentHashMap<>();
 
     public BackupScheduleGUI(MinecraftServerController plugin) {
         this.plugin = plugin;
@@ -66,15 +63,18 @@ public class BackupScheduleGUI {
      */
     private void displaySchedules(Player player, List<APIClient.BackupSchedule> schedules) {
         Inventory inv = Bukkit.createInventory(null, 54, ChatColor.BLUE + "Backup Schedules");
-        slotToScheduleId.clear();
+
+        // プレイヤー固有のマップをクリア
+        String playerKey = player.getUniqueId().toString();
+        playerSlotMap.entrySet().removeIf(entry -> entry.getKey().startsWith(playerKey + ":"));
 
         // スケジュール一覧（最大45個）
         int slot = 0;
         for (APIClient.BackupSchedule schedule : schedules) {
             if (slot >= 45) break;
 
-            // スケジュールIDとスロットをマッピング
-            slotToScheduleId.put(slot, schedule.id);
+            // プレイヤーIDとスロットをキーにしてスケジュールIDを保存
+            playerSlotMap.put(playerKey + ":" + slot, schedule.id);
 
             // 有効/無効でアイコンを変更
             Material material = schedule.enabled ? Material.GREEN_WOOL : Material.GRAY_WOOL;
@@ -256,10 +256,11 @@ public class BackupScheduleGUI {
     }
 
     /**
-     * スロット番号からスケジュールIDを取得
+     * スロット番号からスケジュールIDを取得（プレイヤー固有）
      */
-    public int getScheduleIdFromSlot(int slot) {
-        return slotToScheduleId.getOrDefault(slot, -1);
+    public int getScheduleIdFromSlot(Player player, int slot) {
+        String key = player.getUniqueId().toString() + ":" + slot;
+        return playerSlotMap.getOrDefault(key, -1);
     }
 
     // =============================
@@ -270,7 +271,6 @@ public class BackupScheduleGUI {
      * Cron式の説明を取得
      */
     private String getCronDescription(String cron) {
-        // 簡易的なCron式の説明生成
         String[] parts = cron.split(" ");
         if (parts.length != 5) return "Invalid cron format";
 

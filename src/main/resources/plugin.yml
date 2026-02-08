@@ -1,9 +1,9 @@
 name: MinecraftServerController
-version: 1.2.9
+version: 1.3.9
 main: com.woxloi.minecraftservercontroller.MinecraftServerController
 api-version: 1.20
 author: woxloi
-description: Minecraft Server Control API Plugin
+description: Minecraft Server Control API Plugin with Enhanced Features
 
 commands:
   msc:
@@ -41,8 +41,17 @@ permissions:
     description: Execute console commands
     default: op
   msc.admin:
-    description: Admin level access (OP, plugins, audit logs)
+    description: Admin level access (OP, plugins, audit logs, world management, performance monitoring)
     default: op
   msc.reload:
     description: Reload plugin configuration
     default: op
+  msc.world:
+    description: World management access
+    default: op
+  msc.chat:
+    description: Chat log viewer access
+    default: op
+  msc.performance:
+    description: Performance monitoring access
+    default: true
