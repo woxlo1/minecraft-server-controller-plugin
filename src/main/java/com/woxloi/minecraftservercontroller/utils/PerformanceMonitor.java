@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -109,7 +110,7 @@ public class PerformanceMonitor extends BukkitRunnable {
 
             int players = Bukkit.getOnlinePlayers().size();
 
-            // データベースに記録
+            // データベースに記録（既存のコード）
             int finalTotalEntities = totalEntities;
             int finalTotalChunks = totalChunks;
             plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -130,6 +131,24 @@ public class PerformanceMonitor extends BukkitRunnable {
                     ps.setInt(8, players);
 
                     ps.executeUpdate();
+
+                    // =============================
+                    // ★ 新規追加: APIサーバーにも記録
+                    // =============================
+                    try {
+                        plugin.getAPIClient().recordPerformance(
+                                currentTps,
+                                (int) memoryUsed,
+                                (int) memoryTotal,
+                                memoryPercent,
+                                finalTotalEntities,
+                                finalTotalChunks,
+                                players
+                        );
+                    } catch (IOException e) {
+                        // API記録失敗は警告のみ（ローカルDBには記録済み）
+                        plugin.getLogger().warning("Failed to record performance to API: " + e.getMessage());
+                    }
 
                     // 警告チェック
                     if (currentTps < 15.0) {

@@ -136,9 +136,6 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/msc metrics" + ChatColor.WHITE + " - Server metrics");
         sender.sendMessage(ChatColor.YELLOW + "/msc exec <command>" + ChatColor.WHITE + " - Execute command");
         sender.sendMessage(ChatColor.YELLOW + "/msc reload" + ChatColor.WHITE + " - Reload config");
-
-        sender.sendMessage("");
-        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.AQUA + "New in v1.3.9" + ChatColor.GOLD + " ==========");
         sender.sendMessage(ChatColor.YELLOW + "/msc performance" + ChatColor.WHITE + " - Performance monitoring");
         sender.sendMessage(ChatColor.YELLOW + "/msc world [list|load|unload|backup]" + ChatColor.WHITE + " - World management");
         sender.sendMessage(ChatColor.YELLOW + "/msc chat [search|player]" + ChatColor.WHITE + " - Chat log viewer");
@@ -1009,18 +1006,30 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 String keyword = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
-                List<ChatLogManager.ChatMessage> results = plugin.getChatLogManager().searchMessages(keyword, 20);
 
-                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Chat Search: " + keyword + ChatColor.GOLD + " ==========");
-                if (results.isEmpty()) {
-                    sender.sendMessage(ChatColor.YELLOW + "No messages found");
-                } else {
-                    for (ChatLogManager.ChatMessage msg : results) {
-                        sender.sendMessage(ChatColor.GRAY + msg.getFormattedTimestamp() + ChatColor.YELLOW + " [" + msg.playerName + "] " +
-                                ChatColor.WHITE + msg.message);
+                sender.sendMessage(ChatColor.YELLOW + "Searching chat logs...");
+
+                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                    try {
+                        List<APIClient.ChatMessage> results = plugin.getAPIClient().searchChat(keyword, 20);
+
+                        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN +
+                                "Chat Search: " + keyword + ChatColor.GOLD + " ==========");
+
+                        if (results.isEmpty()) {
+                            sender.sendMessage(ChatColor.YELLOW + "No messages found");
+                        } else {
+                            for (APIClient.ChatMessage msg : results) {
+                                sender.sendMessage(ChatColor.GRAY + msg.timestamp.substring(11, 19) +
+                                        ChatColor.YELLOW + " [" + msg.playerName + "] " +
+                                        ChatColor.WHITE + msg.message);
+                            }
+                            sender.sendMessage(ChatColor.GRAY + "Found " + results.size() + " messages");
+                        }
+                    } catch (Exception e) {
+                        sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
                     }
-                    sender.sendMessage(ChatColor.GRAY + "Found " + results.size() + " messages");
-                }
+                });
                 break;
 
             case "player":
@@ -1029,28 +1038,56 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 String playerName = args[2];
-                Player target = Bukkit.getPlayer(playerName);
-                if (target == null) {
-                    sender.sendMessage(ChatColor.RED + "Player not found: " + playerName);
-                    return true;
-                }
 
-                List<ChatLogManager.ChatMessage> playerMsgs = plugin.getChatLogManager().getPlayerMessages(target.getUniqueId(), 20);
+                sender.sendMessage(ChatColor.YELLOW + "Fetching player chat logs...");
 
-                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + "Chat: " + playerName + ChatColor.GOLD + " ==========");
-                if (playerMsgs.isEmpty()) {
-                    sender.sendMessage(ChatColor.YELLOW + "No messages found");
-                } else {
-                    for (ChatLogManager.ChatMessage msg : playerMsgs) {
-                        sender.sendMessage(ChatColor.GRAY + msg.getFormattedTimestamp() + " " + ChatColor.WHITE + msg.message);
+                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                    try {
+                        List<APIClient.ChatMessage> playerMsgs = plugin.getAPIClient().getPlayerChat(playerName, 20);
+
+                        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN +
+                                "Chat: " + playerName + ChatColor.GOLD + " ==========");
+
+                        if (playerMsgs.isEmpty()) {
+                            sender.sendMessage(ChatColor.YELLOW + "No messages found");
+                        } else {
+                            for (APIClient.ChatMessage msg : playerMsgs) {
+                                sender.sendMessage(ChatColor.GRAY + msg.timestamp.substring(11, 19) + " " +
+                                        ChatColor.WHITE + msg.message);
+                            }
+                            sender.sendMessage(ChatColor.GRAY + "Showing " + playerMsgs.size() + " messages");
+                        }
+                    } catch (Exception e) {
+                        sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
                     }
-                    sender.sendMessage(ChatColor.GRAY + "Showing " + playerMsgs.size() + " messages");
-                }
+                });
+                break;
+
+            case "stats":
+                sender.sendMessage(ChatColor.YELLOW + "Fetching chat statistics...");
+
+                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                    try {
+                        APIClient.ChatStats stats = plugin.getAPIClient().getChatStats();
+
+                        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN +
+                                "Chat Statistics" + ChatColor.GOLD + " ==========");
+                        sender.sendMessage(ChatColor.YELLOW + "Total Messages: " + ChatColor.WHITE + stats.totalMessages);
+                        sender.sendMessage(ChatColor.YELLOW + "Today: " + ChatColor.WHITE + stats.todayMessages);
+
+                        if (stats.topPlayer != null) {
+                            sender.sendMessage(ChatColor.YELLOW + "Top Chatter (7d): " + ChatColor.WHITE +
+                                    stats.topPlayer + ChatColor.GRAY + " (" + stats.topPlayerMessageCount + " messages)");
+                        }
+                    } catch (Exception e) {
+                        sender.sendMessage(ChatColor.RED + "✗ Failed: " + e.getMessage());
+                    }
+                });
                 break;
 
             default:
                 sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
-                sender.sendMessage(ChatColor.YELLOW + "Usage: /msc chat [search|player]");
+                sender.sendMessage(ChatColor.YELLOW + "Usage: /msc chat [search|player|stats]");
         }
 
         return true;
@@ -1164,25 +1201,48 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
             target = (Player) sender;
         }
 
-        PlayerActivityTracker.PlayerStats stats = plugin.getActivityTracker().getPlayerStats(target.getUniqueId());
+        sender.sendMessage(ChatColor.YELLOW + "Fetching statistics...");
 
-        if (stats == null) {
-            sender.sendMessage(ChatColor.YELLOW + "No statistics found for " + target.getName());
-            return true;
-        }
+        final String targetName = target.getName();
 
-        sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + stats.playerName + "'s Stats" + ChatColor.GOLD + " ==========");
-        sender.sendMessage(ChatColor.YELLOW + "Total Playtime: " + ChatColor.WHITE + stats.getFormattedPlaytime());
-        sender.sendMessage(ChatColor.YELLOW + "Total Sessions: " + ChatColor.WHITE + stats.totalSessions);
-        sender.sendMessage(ChatColor.YELLOW + "First Join: " + ChatColor.WHITE + stats.firstJoin);
-        sender.sendMessage(ChatColor.YELLOW + "Last Join: " + ChatColor.WHITE + stats.lastJoin);
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                APIClient.PlayerStats stats = plugin.getAPIClient().getPlayerStats(targetName);
 
-        String recentActivity = plugin.getActivityTracker().getRecentActivity(target.getUniqueId(), 5);
-        if (!recentActivity.isEmpty()) {
-            sender.sendMessage("");
-            sender.sendMessage(ChatColor.GOLD + "Recent Activity:");
-            sender.sendMessage(ChatColor.GRAY + recentActivity);
-        }
+                if (stats == null) {
+                    sender.sendMessage(ChatColor.YELLOW + "No statistics found for " + targetName);
+                    return;
+                }
+
+                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + stats.playerName + "'s Stats" + ChatColor.GOLD + " ==========");
+                sender.sendMessage(ChatColor.YELLOW + "Total Playtime: " + ChatColor.WHITE +
+                        String.format("%.1f hours", stats.totalPlaytimeHours));
+                sender.sendMessage(ChatColor.YELLOW + "Total Sessions: " + ChatColor.WHITE + stats.totalSessions);
+                sender.sendMessage(ChatColor.YELLOW + "First Join: " + ChatColor.WHITE + stats.firstJoin);
+                sender.sendMessage(ChatColor.YELLOW + "Last Join: " + ChatColor.WHITE + stats.lastJoin);
+
+                if (stats.recentActivity != null && !stats.recentActivity.isEmpty()) {
+                    sender.sendMessage("");
+                    sender.sendMessage(ChatColor.GOLD + "Recent Activity:");
+
+                    int count = 0;
+                    for (APIClient.ActivityRecord activity : stats.recentActivity) {
+                        if (count >= 5) break;
+
+                        String loginTime = activity.login;
+                        String status = activity.logout != null
+                                ? "→ Logout: " + activity.logout + " (" + activity.durationMinutes + " min)"
+                                : "→ Currently online";
+
+                        sender.sendMessage(ChatColor.GRAY + "  • " + loginTime + " " + status);
+                        count++;
+                    }
+                }
+
+            } catch (Exception e) {
+                sender.sendMessage(ChatColor.RED + "✗ Failed to get stats: " + e.getMessage());
+            }
+        });
 
         return true;
     }

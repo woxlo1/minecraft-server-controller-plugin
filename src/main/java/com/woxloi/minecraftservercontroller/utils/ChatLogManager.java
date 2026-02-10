@@ -6,6 +6,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -94,6 +95,21 @@ public class ChatLogManager implements Listener {
             ps.setString(5, player.getWorld().getName());
 
             ps.executeUpdate();
+
+            // =============================
+            // ★ 新規追加: APIサーバーにも記録
+            // =============================
+            try {
+                plugin.getAPIClient().logChatMessage(
+                        player.getUniqueId().toString(),
+                        player.getName(),
+                        message,
+                        player.getWorld().getName()
+                );
+            } catch (IOException e) {
+                // API記録失敗は警告のみ（ローカルDBには記録済み）
+                plugin.getLogger().warning("Failed to log chat to API: " + e.getMessage());
+            }
 
         } catch (SQLException e) {
             plugin.getLogger().warning("Failed to log chat message: " + e.getMessage());

@@ -634,6 +634,214 @@ public class APIClient {
         return json.get("logs").getAsString();
     }
 
+    /**
+     * プレイヤー統計を取得
+     */
+    public PlayerStats getPlayerStats(String playerName) throws IOException {
+        String response = get("/stats/player/" + playerName);
+        JsonObject json = gson.fromJson(response, JsonObject.class);
+
+        String playerUuid = json.get("player_uuid").getAsString();
+        String name = json.get("player_name").getAsString();
+        double totalPlaytimeHours = json.get("total_playtime_hours").getAsDouble();
+        int totalSessions = json.get("total_sessions").getAsInt();
+        String firstJoin = json.get("first_join").getAsString();
+        String lastJoin = json.get("last_join").getAsString();
+
+        List<ActivityRecord> recentActivity = new ArrayList<>();
+        JsonArray activityArray = json.getAsJsonArray("recent_activity");
+        for (JsonElement elem : activityArray) {
+            JsonObject activity = elem.getAsJsonObject();
+            String login = activity.get("login").getAsString();
+            String logout = activity.has("logout") && !activity.get("logout").isJsonNull()
+                    ? activity.get("logout").getAsString() : null;
+            Integer durationMinutes = activity.has("duration_minutes") && !activity.get("duration_minutes").isJsonNull()
+                    ? activity.get("duration_minutes").getAsInt() : null;
+
+            recentActivity.add(new ActivityRecord(login, logout, durationMinutes));
+        }
+
+        return new PlayerStats(playerUuid, name, totalPlaytimeHours, totalSessions,
+                firstJoin, lastJoin, recentActivity);
+    }
+
+    /**
+     * 全プレイヤー統計を取得
+     */
+    public List<PlayerStatsSummary> getAllPlayerStats() throws IOException {
+        String response = get("/stats/players");
+        JsonArray array = gson.fromJson(response, JsonArray.class);
+
+        List<PlayerStatsSummary> stats = new ArrayList<>();
+        for (JsonElement elem : array) {
+            JsonObject obj = elem.getAsJsonObject();
+            String playerName = obj.get("player_name").getAsString();
+            double totalPlaytimeHours = obj.get("total_playtime_hours").getAsDouble();
+            int totalSessions = obj.get("total_sessions").getAsInt();
+            String lastJoin = obj.get("last_join").getAsString();
+
+            stats.add(new PlayerStatsSummary(playerName, totalPlaytimeHours, totalSessions, lastJoin));
+        }
+
+        return stats;
+    }
+
+    /**
+     * 現在のパフォーマンス情報を取得
+     */
+    public CurrentPerformance getCurrentPerformance() throws IOException {
+        String response = get("/performance/current");
+        JsonObject json = gson.fromJson(response, JsonObject.class);
+
+        if (json.has("message")) {
+            // データがない場合
+            return null;
+        }
+
+        String timestamp = json.get("timestamp").getAsString();
+        double tps = json.get("tps").getAsDouble();
+        int memoryUsedMb = json.get("memory_used_mb").getAsInt();
+        int memoryTotalMb = json.get("memory_total_mb").getAsInt();
+        double memoryPercent = json.get("memory_percent").getAsDouble();
+        int entities = json.get("entities").getAsInt();
+        int chunks = json.get("chunks").getAsInt();
+        int players = json.get("players").getAsInt();
+
+        return new CurrentPerformance(timestamp, tps, memoryUsedMb, memoryTotalMb,
+                memoryPercent, entities, chunks, players);
+    }
+
+    /**
+     * パフォーマンス履歴を取得
+     */
+    public List<PerformanceHistory> getPerformanceHistory(int hours) throws IOException {
+        String response = get("/performance/history?hours=" + hours);
+        JsonArray array = gson.fromJson(response, JsonArray.class);
+
+        List<PerformanceHistory> history = new ArrayList<>();
+        for (JsonElement elem : array) {
+            JsonObject obj = elem.getAsJsonObject();
+            String timestamp = obj.get("timestamp").getAsString();
+            double tps = obj.get("tps").getAsDouble();
+            double memoryPercent = obj.get("memory_percent").getAsDouble();
+            int entities = obj.get("entities").getAsInt();
+            int chunks = obj.get("chunks").getAsInt();
+
+            history.add(new PerformanceHistory(timestamp, tps, memoryPercent, entities, chunks));
+        }
+
+        return history;
+    }
+
+    /**
+     * パフォーマンスデータを記録
+     */
+    public void recordPerformance(double tps, int memoryUsed, int memoryTotal, double memoryPercent,
+                                  int entities, int chunks, int players) throws IOException {
+        JsonObject data = new JsonObject();
+        data.addProperty("tps", tps);
+        data.addProperty("memory_used", memoryUsed);
+        data.addProperty("memory_total", memoryTotal);
+        data.addProperty("memory_percent", memoryPercent);
+        data.addProperty("entities", entities);
+        data.addProperty("chunks", chunks);
+        data.addProperty("players", players);
+
+        post("/performance/record", gson.toJson(data));
+    }
+
+    /**
+     * 最近のチャットログを取得
+     */
+    public List<ChatMessage> getRecentChat(int limit) throws IOException {
+        String response = get("/chat/recent?limit=" + limit);
+        JsonArray array = gson.fromJson(response, JsonArray.class);
+
+        List<ChatMessage> messages = new ArrayList<>();
+        for (JsonElement elem : array) {
+            JsonObject obj = elem.getAsJsonObject();
+            String timestamp = obj.get("timestamp").getAsString();
+            String playerName = obj.get("player_name").getAsString();
+            String message = obj.get("message").getAsString();
+            String world = obj.get("world").getAsString();
+
+            messages.add(new ChatMessage(timestamp, playerName, message, world));
+        }
+
+        return messages;
+    }
+
+    /**
+     * チャットログをキーワード検索
+     */
+    public List<ChatMessage> searchChat(String keyword, int limit) throws IOException {
+        String response = get("/chat/search?keyword=" + keyword + "&limit=" + limit);
+        JsonArray array = gson.fromJson(response, JsonArray.class);
+
+        List<ChatMessage> messages = new ArrayList<>();
+        for (JsonElement elem : array) {
+            JsonObject obj = elem.getAsJsonObject();
+            String timestamp = obj.get("timestamp").getAsString();
+            String playerName = obj.get("player_name").getAsString();
+            String message = obj.get("message").getAsString();
+            String world = obj.get("world").getAsString();
+
+            messages.add(new ChatMessage(timestamp, playerName, message, world));
+        }
+
+        return messages;
+    }
+
+    /**
+     * プレイヤー別チャットログを取得
+     */
+    public List<ChatMessage> getPlayerChat(String playerName, int limit) throws IOException {
+        String response = get("/chat/player/" + playerName + "?limit=" + limit);
+        JsonArray array = gson.fromJson(response, JsonArray.class);
+
+        List<ChatMessage> messages = new ArrayList<>();
+        for (JsonElement elem : array) {
+            JsonObject obj = elem.getAsJsonObject();
+            String timestamp = obj.get("timestamp").getAsString();
+            String message = obj.get("message").getAsString();
+            String world = obj.get("world").getAsString();
+
+            messages.add(new ChatMessage(timestamp, playerName, message, world));
+        }
+
+        return messages;
+    }
+
+    /**
+     * チャット統計を取得
+     */
+    public ChatStats getChatStats() throws IOException {
+        String response = get("/chat/stats");
+        JsonObject json = gson.fromJson(response, JsonObject.class);
+
+        long totalMessages = json.get("total_messages").getAsLong();
+        long todayMessages = json.get("today_messages").getAsLong();
+        JsonObject topChatter = json.getAsJsonObject("top_chatter");
+        String topPlayerName = topChatter.get("player_name").isJsonNull()
+                ? null : topChatter.get("player_name").getAsString();
+        int messageCount = topChatter.get("message_count").getAsInt();
+
+        return new ChatStats(totalMessages, todayMessages, topPlayerName, messageCount);
+    }
+
+    /**
+     * チャットメッセージを記録
+     */
+    public void logChatMessage(String playerUuid, String playerName, String message, String world) throws IOException {
+        JsonObject data = new JsonObject();
+        data.addProperty("player_uuid", playerUuid);
+        data.addProperty("player_name", playerName);
+        data.addProperty("message", message);
+        data.addProperty("world", world);
+
+        post("/chat/log", gson.toJson(data));
+    }
+
     // =============================
     // データクラス
     // =============================
@@ -770,6 +978,123 @@ public class APIClient {
             this.action = action;
             this.detail = detail;
             this.ip = ip;
+        }
+    }
+
+    public static class PlayerStats {
+        public final String playerUuid;
+        public final String playerName;
+        public final double totalPlaytimeHours;
+        public final int totalSessions;
+        public final String firstJoin;
+        public final String lastJoin;
+        public final List<ActivityRecord> recentActivity;
+
+        public PlayerStats(String playerUuid, String playerName, double totalPlaytimeHours,
+                           int totalSessions, String firstJoin, String lastJoin,
+                           List<ActivityRecord> recentActivity) {
+            this.playerUuid = playerUuid;
+            this.playerName = playerName;
+            this.totalPlaytimeHours = totalPlaytimeHours;
+            this.totalSessions = totalSessions;
+            this.firstJoin = firstJoin;
+            this.lastJoin = lastJoin;
+            this.recentActivity = recentActivity;
+        }
+    }
+
+    public static class ActivityRecord {
+        public final String login;
+        public final String logout;
+        public final Integer durationMinutes;
+
+        public ActivityRecord(String login, String logout, Integer durationMinutes) {
+            this.login = login;
+            this.logout = logout;
+            this.durationMinutes = durationMinutes;
+        }
+    }
+
+    public static class PlayerStatsSummary {
+        public final String playerName;
+        public final double totalPlaytimeHours;
+        public final int totalSessions;
+        public final String lastJoin;
+
+        public PlayerStatsSummary(String playerName, double totalPlaytimeHours,
+                                  int totalSessions, String lastJoin) {
+            this.playerName = playerName;
+            this.totalPlaytimeHours = totalPlaytimeHours;
+            this.totalSessions = totalSessions;
+            this.lastJoin = lastJoin;
+        }
+    }
+
+    public static class CurrentPerformance {
+        public final String timestamp;
+        public final double tps;
+        public final int memoryUsedMb;
+        public final int memoryTotalMb;
+        public final double memoryPercent;
+        public final int entities;
+        public final int chunks;
+        public final int players;
+
+        public CurrentPerformance(String timestamp, double tps, int memoryUsedMb, int memoryTotalMb,
+                                  double memoryPercent, int entities, int chunks, int players) {
+            this.timestamp = timestamp;
+            this.tps = tps;
+            this.memoryUsedMb = memoryUsedMb;
+            this.memoryTotalMb = memoryTotalMb;
+            this.memoryPercent = memoryPercent;
+            this.entities = entities;
+            this.chunks = chunks;
+            this.players = players;
+        }
+    }
+
+    public static class PerformanceHistory {
+        public final String timestamp;
+        public final double tps;
+        public final double memoryPercent;
+        public final int entities;
+        public final int chunks;
+
+        public PerformanceHistory(String timestamp, double tps, double memoryPercent,
+                                  int entities, int chunks) {
+            this.timestamp = timestamp;
+            this.tps = tps;
+            this.memoryPercent = memoryPercent;
+            this.entities = entities;
+            this.chunks = chunks;
+        }
+    }
+
+    public static class ChatMessage {
+        public final String timestamp;
+        public final String playerName;
+        public final String message;
+        public final String world;
+
+        public ChatMessage(String timestamp, String playerName, String message, String world) {
+            this.timestamp = timestamp;
+            this.playerName = playerName;
+            this.message = message;
+            this.world = world;
+        }
+    }
+
+    public static class ChatStats {
+        public final long totalMessages;
+        public final long todayMessages;
+        public final String topPlayer;
+        public final int topPlayerMessageCount;
+
+        public ChatStats(long totalMessages, long todayMessages, String topPlayer, int topPlayerMessageCount) {
+            this.totalMessages = totalMessages;
+            this.todayMessages = todayMessages;
+            this.topPlayer = topPlayer;
+            this.topPlayerMessageCount = topPlayerMessageCount;
         }
     }
 }
