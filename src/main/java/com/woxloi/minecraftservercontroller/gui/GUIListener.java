@@ -2,8 +2,10 @@ package com.woxloi.minecraftservercontroller.gui;
 
 import com.woxloi.minecraftservercontroller.MinecraftServerController;
 import com.woxloi.minecraftservercontroller.api.APIClient;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -12,9 +14,32 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import java.util.Set;
+
 public class GUIListener implements Listener {
 
     private final MinecraftServerController plugin;
+
+    // v1.4.1 fix: contains("Server") のような部分一致では他プラグインのGUIも
+    //             誤ってキャンセルされてしまうため、固定セットで完全一致チェックに変更
+    private static final Set<String> MSC_GUI_TITLES = Set.of(
+            "MSC Control Panel",
+            "Server Dashboard",
+            "Server Control",
+            "Server Status",
+            "Backup Management",
+            "Backup List",
+            "Backup Schedules",
+            "Player Management",
+            "Plugin Management",
+            "Console Commands",
+            "Audit Logs",
+            "MSC Settings",
+            "Performance Monitor",
+            "World Management",
+            "Chat Log Viewer",
+            "Online Players"
+    );
 
     public GUIListener(MinecraftServerController plugin) {
         this.plugin = plugin;
@@ -22,16 +47,11 @@ public class GUIListener implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        String title = event.getView().getTitle();
+        // v1.4.1 fix: カラーコードを除いたタイトルで完全一致チェック
+        String rawTitle = event.getView().getTitle();
+        String title = ChatColor.stripColor(rawTitle);
 
-        if (!title.contains("MSC") && !title.contains("Backup") &&
-                !title.contains("Player") && !title.contains("Plugin") &&
-                !title.contains("Server") && !title.contains("Dashboard") &&
-                !title.contains("Schedule") && !title.contains("Console") &&
-                !title.contains("Audit") && !title.contains("Settings") &&
-                !title.contains("Status") && !title.contains("Control Panel") &&
-                !title.contains("Performance") && !title.contains("World") &&
-                !title.contains("Chat Log")) {
+        if (!MSC_GUI_TITLES.contains(title)) {
             return;
         }
 
@@ -55,65 +75,25 @@ public class GUIListener implements Listener {
 
         String itemName = ChatColor.stripColor(meta.getDisplayName());
 
-        // メインメニュー
-        if (title.contains("Control Panel")) {
-            handleMainMenu(player, itemName);
-        }
-        // ダッシュボード
-        else if (title.contains("Dashboard")) {
-            handleDashboard(player, itemName);
-        }
-        // サーバーコントロール
-        else if (title.contains("Server Control")) {
-            handleServerControl(player, itemName);
-        }
-        // サーバーステータス
-        else if (title.contains("Server Status")) {
-            handleServerStatus(player, itemName);
-        }
-        // バックアップメニュー
-        else if (title.contains("Backup Management")) {
-            handleBackupMenu(player, itemName);
-        }
-        // バックアップリスト
-        else if (title.contains("Backup List")) {
-            handleBackupList(player, itemName, event.getClick());
-        }
-        // バックアップスケジュール
-        else if (title.contains("Backup Schedules")) {
-            handleBackupSchedules(player, itemName, event.getClick());
-        }
-        // プレイヤー管理
-        else if (title.contains("Player Management")) {
-            handlePlayerManagement(player, itemName);
-        }
-        // プラグイン管理
-        else if (title.contains("Plugin Management")) {
-            handlePluginGUI(player, itemName);
-        }
-        // コンソール
-        else if (title.contains("Console Commands")) {
-            handleConsole(player, itemName);
-        }
-        // 監査ログ
-        else if (title.contains("Audit Logs")) {
-            handleAuditLogs(player, itemName);
-        }
-        // 設定
-        else if (title.contains("MSC Settings")) {
-            handleSettings(player, itemName);
-        }
-        // パフォーマンスモニター（新機能）
-        else if (title.contains("Performance Monitor")) {
-            handlePerformanceMonitor(player, itemName);
-        }
-        // ワールド管理（新機能）
-        else if (title.contains("World Management")) {
-            handleWorldManagement(player, itemName);
-        }
-        // チャットログ（新機能）
-        else if (title.contains("Chat Log")) {
-            handleChatLog(player, itemName);
+        switch (title) {
+            case "MSC Control Panel":   handleMainMenu(player, itemName);               break;
+            case "Server Dashboard":    handleDashboard(player, itemName);              break;
+            case "Server Control":      handleServerControl(player, itemName);          break;
+            case "Server Status":       handleServerStatus(player, itemName);           break;
+            case "Backup Management":   handleBackupMenu(player, itemName);             break;
+            case "Backup List":         handleBackupList(player, itemName, event.getClick()); break;
+            case "Backup Schedules":    handleBackupSchedules(player, itemName, event.getClick()); break;
+            case "Player Management":   handlePlayerManagement(player, itemName);       break;
+            case "Plugin Management":   handlePluginGUI(player, itemName);              break;
+            case "Console Commands":    handleConsole(player, itemName);                break;
+            case "Audit Logs":          handleAuditLogs(player, itemName);              break;
+            case "MSC Settings":        handleSettings(player, itemName);               break;
+            case "Performance Monitor": handlePerformanceMonitor(player, itemName);     break;
+            case "World Management":
+                // v1.4.1 fix: clickType と slot を渡してワールド操作を実装
+                handleWorldManagement(player, itemName, event.getClick(), event.getSlot());
+                break;
+            case "Chat Log Viewer":     handleChatLog(player, itemName);                break;
         }
     }
 
@@ -562,10 +542,6 @@ public class GUIListener implements Listener {
         }
     }
 
-    // =============================
-    // 新機能のハンドラ（v1.3.9）
-    // =============================
-
     private void handlePerformanceMonitor(Player player, String itemName) {
         switch (itemName) {
             case "🔄 Refresh":
@@ -578,7 +554,8 @@ public class GUIListener implements Listener {
         }
     }
 
-    private void handleWorldManagement(Player player, String itemName) {
+    // v1.4.1 fix: clickType と slot を引数に追加して実際のワールド操作を実装
+    private void handleWorldManagement(Player player, String itemName, ClickType clickType, int slot) {
         if (itemName.equals("🔄 Refresh")) {
             new WorldManagementGUI(plugin).open(player);
             return;
@@ -593,12 +570,63 @@ public class GUIListener implements Listener {
             return; // 情報表示のみ
         }
 
-        // ワールド名の処理
-        player.closeInventory();
-        player.sendMessage(ChatColor.YELLOW + "Use commands to manage worlds:");
-        player.sendMessage(ChatColor.WHITE + "/msc world load <name>");
-        player.sendMessage(ChatColor.WHITE + "/msc world unload <name>");
-        player.sendMessage(ChatColor.WHITE + "/msc world backup <name>");
+        // ワールドアイテム（スロット 0〜44）
+        if (slot >= 45) return;
+
+        if (!player.hasPermission("msc.world")) {
+            player.sendMessage(ChatColor.RED + "You don't have permission!");
+            return;
+        }
+
+        // v1.4.1 fix: アイテム名から "✓ " / "○ " プレフィックスとカラーコードを除いてワールド名を取得
+        //             WorldManagementGUI のアイテム名フォーマット:
+        //             (ChatColor.GREEN + "✓ " | ChatColor.GRAY + "○ ") + ChatColor.AQUA + worldName
+        String worldName = ChatColor.stripColor(itemName).replaceAll("^[✓○] ", "").trim();
+        if (worldName.isEmpty()) return;
+
+        if (clickType == ClickType.SHIFT_LEFT || clickType == ClickType.SHIFT_RIGHT) {
+            // Shift+クリック: ワールドバックアップ
+            player.closeInventory();
+            player.sendMessage(ChatColor.YELLOW + "Backing up world: " + worldName + "...");
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                try {
+                    java.io.File backup = plugin.getWorldManager().backupWorld(worldName);
+                    player.sendMessage(ChatColor.GREEN + "✓ World backed up: " + backup.getName());
+                } catch (Exception e) {
+                    player.sendMessage(ChatColor.RED + "✗ Failed to backup: " + e.getMessage());
+                }
+            });
+
+        } else if (clickType.isRightClick()) {
+            // 右クリック: スポーンへテレポート（ロード済みのみ）
+            World w = Bukkit.getWorld(worldName);
+            if (w != null) {
+                player.closeInventory();
+                player.teleport(w.getSpawnLocation());
+                player.sendMessage(ChatColor.GREEN + "✓ Teleported to spawn of " + worldName);
+            } else {
+                player.sendMessage(ChatColor.RED + "World is not loaded: " + worldName);
+            }
+
+        } else if (clickType.isLeftClick()) {
+            // 左クリック: ロード/アンロードをトグル
+            player.closeInventory();
+            World w = Bukkit.getWorld(worldName);
+            if (w != null) {
+                boolean result = plugin.getWorldManager().unloadWorld(worldName, true);
+                player.sendMessage(result
+                        ? ChatColor.GREEN + "✓ World unloaded: " + worldName
+                        : ChatColor.RED   + "✗ Failed to unload: " + worldName);
+            } else {
+                boolean result = plugin.getWorldManager().loadWorld(worldName);
+                player.sendMessage(result
+                        ? ChatColor.GREEN + "✓ World loaded: " + worldName
+                        : ChatColor.RED   + "✗ Failed to load: " + worldName);
+            }
+            // GUIを再描画
+            plugin.getServer().getScheduler().runTaskLater(plugin,
+                    () -> new WorldManagementGUI(plugin).open(player), 10L);
+        }
     }
 
     private void handleChatLog(Player player, String itemName) {

@@ -27,8 +27,8 @@ public class PerformanceMonitor extends BukkitRunnable {
 
     private final MinecraftServerController plugin;
     private final String dbPath;
-    private int tickCount = 0;
-    private long lastCheck = System.currentTimeMillis();
+    // v1.4.1 fix: tickCount / lastCheck を削除
+    //             runTaskTimer の間隔を 100L にしたため run() は直接処理するだけでよい
 
     public PerformanceMonitor(MinecraftServerController plugin, String dbPath) {
         this.plugin = plugin;
@@ -67,15 +67,11 @@ public class PerformanceMonitor extends BukkitRunnable {
         }
     }
 
+    // v1.4.1 fix: runTaskTimer(this, 20L, 100L) で5秒ごとに呼ばれるため
+    //             カウンタによる間引きが不要になった。run() から直接記録する。
     @Override
     public void run() {
-        tickCount++;
-
-        // 5秒ごとに記録
-        if (tickCount >= 100) {
-            recordMetrics();
-            tickCount = 0;
-        }
+        recordMetrics();
     }
 
     /**
@@ -83,12 +79,6 @@ public class PerformanceMonitor extends BukkitRunnable {
      */
     private void recordMetrics() {
         try {
-            // TPS計算
-            long now = System.currentTimeMillis();
-            long timeDiff = now - lastCheck;
-            double tps = (100.0 * 1000.0) / timeDiff;
-            lastCheck = now;
-
             // Bukkit TPSを取得（Paper/Spigot）
             double[] tpsArray = Bukkit.getTPS();
             double currentTps = tpsArray[0]; // 1分平均
@@ -110,7 +100,15 @@ public class PerformanceMonitor extends BukkitRunnable {
 
             int players = Bukkit.getOnlinePlayers().size();
 
-            // データベースに記録（既存のコード）
+            // TPS低下の警告チェック（メインスレッドで通知）
+            if (currentTps < 15.0) {
+                plugin.getNotificationManager().notifyWarning(
+                        String.format("Low TPS detected: %.2f (Entities: %d, Chunks: %d)",
+                                currentTps, totalEntities, totalChunks)
+                );
+            }
+
+            // DB書き込みとAPI送信は非同期で
             int finalTotalEntities = totalEntities;
             int finalTotalChunks = totalChunks;
             plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -132,9 +130,7 @@ public class PerformanceMonitor extends BukkitRunnable {
 
                     ps.executeUpdate();
 
-                    // =============================
-                    // ★ 新規追加: APIサーバーにも記録
-                    // =============================
+                    // APIサーバーにも記録
                     try {
                         plugin.getAPIClient().recordPerformance(
                                 currentTps,
@@ -148,14 +144,6 @@ public class PerformanceMonitor extends BukkitRunnable {
                     } catch (IOException e) {
                         // API記録失敗は警告のみ（ローカルDBには記録済み）
                         plugin.getLogger().warning("Failed to record performance to API: " + e.getMessage());
-                    }
-
-                    // 警告チェック
-                    if (currentTps < 15.0) {
-                        plugin.getNotificationManager().notifyWarning(
-                                String.format("Low TPS detected: %.2f (Entities: %d, Chunks: %d)",
-                                        currentTps, finalTotalEntities, finalTotalChunks)
-                        );
                     }
 
                 } catch (SQLException e) {

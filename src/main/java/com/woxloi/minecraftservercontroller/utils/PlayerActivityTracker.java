@@ -29,11 +29,15 @@ public class PlayerActivityTracker implements Listener {
     private final MinecraftServerController plugin;
     private final String dbPath;
     private final Map<UUID, Long> sessionStartTimes;
+    // v1.4.1 fix: ログイン時刻をメモリに保持することで
+    //             SQLiteが非対応のUPDATE ORDER BY/LIMITを回避する
+    private final Map<UUID, String> sessionLoginTimes;
 
     public PlayerActivityTracker(MinecraftServerController plugin, String dbPath) {
         this.plugin = plugin;
         this.dbPath = dbPath;
         this.sessionStartTimes = new HashMap<>();
+        this.sessionLoginTimes = new HashMap<>();
         initDatabase();
     }
 
@@ -78,19 +82,21 @@ public class PlayerActivityTracker implements Listener {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
         String name = player.getName();
-        LocalDateTime now = LocalDateTime.now();
+        String nowStr = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
         sessionStartTimes.put(uuid, System.currentTimeMillis());
+        // v1.4.1 fix: ログイン時刻を文字列で保持しておく
+        sessionLoginTimes.put(uuid, nowStr);
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try (Connection conn = getConnection()) {
-                // アクティビティログに記録
+                // v1.4.1 fix: INSERT OR IGNORE で重複エラーを防ぐ
                 PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO player_activity (uuid, player_name, login_time) VALUES (?, ?, ?)"
+                        "INSERT OR IGNORE INTO player_activity (uuid, player_name, login_time) VALUES (?, ?, ?)"
                 );
                 ps.setString(1, uuid.toString());
                 ps.setString(2, name);
-                ps.setString(3, now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                ps.setString(3, nowStr);
                 ps.executeUpdate();
 
                 // 統計を更新
@@ -98,17 +104,14 @@ public class PlayerActivityTracker implements Listener {
                     INSERT INTO player_stats (uuid, player_name, total_sessions, first_join, last_join)
                     VALUES (?, ?, 1, ?, ?)
                     ON CONFLICT(uuid) DO UPDATE SET
-                        player_name = ?,
+                        player_name = excluded.player_name,
                         total_sessions = total_sessions + 1,
-                        last_join = ?
+                        last_join = excluded.last_join
                 """);
-                String nowStr = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                 ps.setString(1, uuid.toString());
                 ps.setString(2, name);
                 ps.setString(3, nowStr);
                 ps.setString(4, nowStr);
-                ps.setString(5, name);
-                ps.setString(6, nowStr);
                 ps.executeUpdate();
 
             } catch (SQLException e) {
@@ -124,26 +127,29 @@ public class PlayerActivityTracker implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
-        LocalDateTime now = LocalDateTime.now();
+        String nowStr = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
         Long sessionStart = sessionStartTimes.remove(uuid);
-        if (sessionStart == null) return;
+        // v1.4.1 fix: ログイン時刻を取り出す
+        String loginTime = sessionLoginTimes.remove(uuid);
+
+        if (sessionStart == null || loginTime == null) return;
 
         long duration = (System.currentTimeMillis() - sessionStart) / 1000; // 秒単位
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try (Connection conn = getConnection()) {
-                // ログアウト時刻とセッション時間を記録
+                // v1.4.1 fix: ORDER BY/LIMIT を使わず loginTime で直接特定する
+                //             SQLite は UPDATE に ORDER BY/LIMIT を使えない
                 PreparedStatement ps = conn.prepareStatement("""
                     UPDATE player_activity
                     SET logout_time = ?, session_duration = ?
-                    WHERE uuid = ? AND logout_time IS NULL
-                    ORDER BY login_time DESC
-                    LIMIT 1
+                    WHERE uuid = ? AND login_time = ? AND logout_time IS NULL
                 """);
-                ps.setString(1, now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                ps.setString(1, nowStr);
                 ps.setLong(2, duration);
                 ps.setString(3, uuid.toString());
+                ps.setString(4, loginTime);
                 ps.executeUpdate();
 
                 // 総プレイ時間を更新

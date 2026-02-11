@@ -24,8 +24,11 @@ public class CommandTemplateManager {
 
     private final File dataFile;
     private final Gson gson;
-    private Map<UUID, List<CommandTemplate>> playerTemplates;
-    private Map<UUID, List<String>> commandHistory;
+    // v1.4.1 fix: Gson は Map<UUID, ...> のキーを正しくシリアライズ/デシリアライズできない
+    //             （保存時は UUID.toString() で文字列化されるが、読込時に UUID として復元されず型不一致になる）
+    //             キーを String に統一することで問題を解消する
+    private Map<String, List<CommandTemplate>> playerTemplates;
+    private Map<String, List<String>> commandHistory;
     private static final int MAX_HISTORY = 50;
 
     public CommandTemplateManager(File dataDir) {
@@ -40,7 +43,8 @@ public class CommandTemplateManager {
      * テンプレートを追加
      */
     public void addTemplate(UUID playerId, String name, String command, String description) {
-        List<CommandTemplate> templates = playerTemplates.computeIfAbsent(playerId, k -> new ArrayList<>());
+        // v1.4.1 fix: playerId.toString() でキーを統一
+        List<CommandTemplate> templates = playerTemplates.computeIfAbsent(playerId.toString(), k -> new ArrayList<>());
 
         // 同名テンプレートを削除
         templates.removeIf(t -> t.name.equals(name));
@@ -53,7 +57,7 @@ public class CommandTemplateManager {
      * テンプレートを削除
      */
     public boolean removeTemplate(UUID playerId, String name) {
-        List<CommandTemplate> templates = playerTemplates.get(playerId);
+        List<CommandTemplate> templates = playerTemplates.get(playerId.toString());
         if (templates == null) return false;
 
         boolean removed = templates.removeIf(t -> t.name.equals(name));
@@ -67,14 +71,14 @@ public class CommandTemplateManager {
      * テンプレート一覧を取得
      */
     public List<CommandTemplate> getTemplates(UUID playerId) {
-        return playerTemplates.getOrDefault(playerId, new ArrayList<>());
+        return playerTemplates.getOrDefault(playerId.toString(), new ArrayList<>());
     }
 
     /**
      * テンプレートを取得
      */
     public CommandTemplate getTemplate(UUID playerId, String name) {
-        List<CommandTemplate> templates = playerTemplates.get(playerId);
+        List<CommandTemplate> templates = playerTemplates.get(playerId.toString());
         if (templates == null) return null;
 
         return templates.stream()
@@ -100,7 +104,7 @@ public class CommandTemplateManager {
      * コマンド履歴に追加
      */
     public void addToHistory(UUID playerId, String command) {
-        List<String> history = commandHistory.computeIfAbsent(playerId, k -> new ArrayList<>());
+        List<String> history = commandHistory.computeIfAbsent(playerId.toString(), k -> new ArrayList<>());
 
         // 重複を削除
         history.remove(command);
@@ -120,7 +124,7 @@ public class CommandTemplateManager {
      * コマンド履歴を取得
      */
     public List<String> getHistory(UUID playerId, int limit) {
-        List<String> history = commandHistory.getOrDefault(playerId, new ArrayList<>());
+        List<String> history = commandHistory.getOrDefault(playerId.toString(), new ArrayList<>());
         return history.subList(0, Math.min(limit, history.size()));
     }
 
@@ -128,7 +132,7 @@ public class CommandTemplateManager {
      * デフォルトテンプレートを作成
      */
     public void createDefaultTemplates(UUID playerId) {
-        if (playerTemplates.containsKey(playerId)) return;
+        if (playerTemplates.containsKey(playerId.toString())) return;
 
         addTemplate(playerId, "day", "time set day", "Set time to day");
         addTemplate(playerId, "night", "time set night", "Set time to night");
@@ -143,6 +147,7 @@ public class CommandTemplateManager {
      */
     private void save() {
         try (FileWriter writer = new FileWriter(dataFile)) {
+            // v1.4.1 fix: String キーで保存するため Gson が正しくシリアライズできる
             Map<String, Object> data = new HashMap<>();
             data.put("templates", playerTemplates);
             data.put("history", commandHistory);
@@ -164,12 +169,14 @@ public class CommandTemplateManager {
 
             if (data != null) {
                 if (data.containsKey("templates")) {
-                    Type templatesType = new TypeToken<Map<UUID, List<CommandTemplate>>>(){}.getType();
+                    // v1.4.1 fix: String キーで読み込む
+                    Type templatesType = new TypeToken<Map<String, List<CommandTemplate>>>(){}.getType();
                     playerTemplates = gson.fromJson(gson.toJson(data.get("templates")), templatesType);
                 }
 
                 if (data.containsKey("history")) {
-                    Type historyType = new TypeToken<Map<UUID, List<String>>>(){}.getType();
+                    // v1.4.1 fix: String キーで読み込む
+                    Type historyType = new TypeToken<Map<String, List<String>>>(){}.getType();
                     commandHistory = gson.fromJson(gson.toJson(data.get("history")), historyType);
                 }
             }

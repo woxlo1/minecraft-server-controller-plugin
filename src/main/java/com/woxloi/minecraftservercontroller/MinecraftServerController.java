@@ -62,10 +62,13 @@ public class MinecraftServerController extends JavaPlugin {
         activityTracker = new PlayerActivityTracker(this, activityDbPath);
         getServer().getPluginManager().registerEvents(activityTracker, this);
 
-        // パフォーマンスモニター初期化（5秒ごとに記録）
+        // パフォーマンスモニター初期化
+        // v1.4.1 fix: 1L(毎tick)から100L(5秒=100tick)に変更
+        //             run()内でカウンタを使って間引く必要がなくなり、
+        //             メインスレッドの不要なオーバーヘッドを解消
         String performanceDbPath = new File(dataDir, "performance.db").getAbsolutePath();
         performanceMonitor = new PerformanceMonitor(this, performanceDbPath);
-        performanceMonitor.runTaskTimer(this, 20L, 1L);
+        performanceMonitor.runTaskTimer(this, 20L, 100L);
 
         // ワールドマネージャー初期化
         File backupDir = new File(getDataFolder().getParentFile().getParentFile(), "backups");
@@ -86,10 +89,11 @@ public class MinecraftServerController extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new GUIListener(this), this);
         getServer().getPluginManager().registerEvents(new EnhancedGUIListener(this), this);
 
-        getLogger().info("MinecraftServerController v1.3.9 has been enabled!");
+        // v1.4.1 fix: バージョン表記を v1.3.9 → v1.4.1 に修正
+        getLogger().info("MinecraftServerController v1.4.1 has been enabled!");
         getLogger().info("API URL: " + apiUrl);
         getLogger().info("Debug Mode: " + (debug ? "ENABLED" : "DISABLED"));
-        getLogger().info("New Features:");
+        getLogger().info("Features:");
         getLogger().info("  - Player Activity Tracking");
         getLogger().info("  - Performance Monitoring");
         getLogger().info("  - World Management");
@@ -104,7 +108,7 @@ public class MinecraftServerController extends JavaPlugin {
             performanceMonitor.cancel();
         }
 
-        getLogger().info("MinecraftServerController has been disabled!");
+        getLogger().info("MinecraftServerController v1.4.1 has been disabled!");
     }
 
     public long getUptimeMillis() {
