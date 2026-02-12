@@ -8,6 +8,10 @@ import com.woxloi.minecraftservercontroller.api.APIClient;
 import com.woxloi.minecraftservercontroller.gui.GUIListener;
 
 import java.io.File;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.Duration;
 
 public class MinecraftServerController extends JavaPlugin {
 
@@ -20,13 +24,20 @@ public class MinecraftServerController extends JavaPlugin {
     private CommandTemplateManager templateManager;
     private ChatLogManager chatLogManager;
 
-    private long serverStartNano;
+    private ZonedDateTime serverStartTime;
     private File dataDir;
+
+    // 日本時間のタイムゾーン（全プラグインで使用）
+    public static final ZoneId JAPAN_ZONE = ZoneId.of("Asia/Tokyo");
+
+    // 日時フォーマッター
+    public static final DateTimeFormatter DATETIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
 
     @Override
     public void onEnable() {
         instance = this;
-        serverStartNano = System.nanoTime();
+        serverStartTime = ZonedDateTime.now(JAPAN_ZONE);
 
         // データディレクトリ作成
         dataDir = new File(getDataFolder(), "data");
@@ -63,9 +74,6 @@ public class MinecraftServerController extends JavaPlugin {
         getServer().getPluginManager().registerEvents(activityTracker, this);
 
         // パフォーマンスモニター初期化
-        // v1.4.1 fix: 1L(毎tick)から100L(5秒=100tick)に変更
-        //             run()内でカウンタを使って間引く必要がなくなり、
-        //             メインスレッドの不要なオーバーヘッドを解消
         String performanceDbPath = new File(dataDir, "performance.db").getAbsolutePath();
         performanceMonitor = new PerformanceMonitor(this, performanceDbPath);
         performanceMonitor.runTaskTimer(this, 20L, 100L);
@@ -89,16 +97,16 @@ public class MinecraftServerController extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new GUIListener(this), this);
         getServer().getPluginManager().registerEvents(new EnhancedGUIListener(this), this);
 
-        // v1.4.1 fix: バージョン表記を v1.3.9 → v1.4.1 に修正
         getLogger().info("MinecraftServerController v1.4.1 has been enabled!");
+        getLogger().info("Server started at: " + getFormattedStartTime());
         getLogger().info("API URL: " + apiUrl);
         getLogger().info("Debug Mode: " + (debug ? "ENABLED" : "DISABLED"));
         getLogger().info("Features:");
-        getLogger().info("  - Player Activity Tracking");
-        getLogger().info("  - Performance Monitoring");
+        getLogger().info("  - Player Activity Tracking (JST)");
+        getLogger().info("  - Performance Monitoring (JST)");
         getLogger().info("  - World Management");
         getLogger().info("  - Command Templates");
-        getLogger().info("  - Chat Log Viewer");
+        getLogger().info("  - Chat Log Viewer (JST)");
     }
 
     @Override
@@ -109,10 +117,52 @@ public class MinecraftServerController extends JavaPlugin {
         }
 
         getLogger().info("MinecraftServerController v1.4.1 has been disabled!");
+        getLogger().info("Total uptime: " + getFormattedUptime());
     }
 
+    /**
+     * サーバー稼働時間をミリ秒で取得
+     */
     public long getUptimeMillis() {
-        return (System.nanoTime() - serverStartNano) / 1_000_000;
+        return Duration.between(serverStartTime, ZonedDateTime.now(JAPAN_ZONE)).toMillis();
+    }
+
+    /**
+     * サーバー起動時刻を取得
+     */
+    public ZonedDateTime getServerStartTime() {
+        return serverStartTime;
+    }
+
+    /**
+     * 現在時刻を日本時間で取得
+     */
+    public static ZonedDateTime getCurrentTime() {
+        return ZonedDateTime.now(JAPAN_ZONE);
+    }
+
+    /**
+     * 現在時刻をフォーマット済み文字列で取得
+     */
+    public static String getFormattedCurrentTime() {
+        return getCurrentTime().format(DATETIME_FORMATTER);
+    }
+
+    /**
+     * サーバー起動時刻をフォーマット済み文字列で取得
+     */
+    public String getFormattedStartTime() {
+        return serverStartTime.format(DATETIME_FORMATTER);
+    }
+
+    /**
+     * サーバー稼働時間をフォーマット済み文字列で取得
+     */
+    public String getFormattedUptime() {
+        long millis = getUptimeMillis();
+        long hours = millis / (1000 * 60 * 60);
+        long minutes = (millis / (1000 * 60)) % 60;
+        return String.format("%d時間 %d分", hours, minutes);
     }
 
     public static MinecraftServerController getInstance() {

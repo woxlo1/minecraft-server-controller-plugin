@@ -51,14 +51,15 @@ public class OnlinePlayersGUI {
     private void displayPlayers(Player viewer, APIClient.PlayerList apiPlayers) {
         Inventory inv = Bukkit.createInventory(null, 54, ChatColor.GREEN + "Online Players");
 
-        // サーバー情報（上部）
+        // サーバー情報（上部）- 現在時刻を表示
         inv.setItem(4, createItem(Material.EMERALD,
-                ChatColor.GOLD + "Server Information",
+                ChatColor.GOLD + "サーバー情報",
                 ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━",
-                ChatColor.YELLOW + "Online Players: " + ChatColor.WHITE + apiPlayers.count +
+                ChatColor.YELLOW + "現在時刻: " + ChatColor.WHITE + MinecraftServerController.getFormattedCurrentTime(),
+                ChatColor.YELLOW + "オンライン: " + ChatColor.WHITE + apiPlayers.count +
                         ChatColor.GRAY + " / " + ChatColor.WHITE + Bukkit.getMaxPlayers(),
-                ChatColor.YELLOW + "Max Players: " + ChatColor.WHITE + Bukkit.getMaxPlayers(),
-                ChatColor.YELLOW + "Server TPS: " + ChatColor.WHITE + getServerTPS(),
+                ChatColor.YELLOW + "サーバーTPS: " + ChatColor.WHITE + getServerTPS(),
+                ChatColor.YELLOW + "稼働時間: " + ChatColor.WHITE + plugin.getFormattedUptime(),
                 ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━"));
 
         // オンラインプレイヤー一覧（最大45人）
@@ -157,14 +158,15 @@ public class OnlinePlayersGUI {
                     ChatColor.GRAY + "The server is currently empty"));
         }
 
-        // 統計情報
+        // 統計情報 - 現在時刻を含める
         inv.setItem(49, createItem(Material.BOOK,
                 ChatColor.AQUA + "📊 Server Statistics",
                 ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━",
+                ChatColor.YELLOW + "現在時刻: " + ChatColor.WHITE + MinecraftServerController.getFormattedCurrentTime(),
                 ChatColor.YELLOW + "Total Players: " + ChatColor.WHITE + apiPlayers.count,
                 ChatColor.YELLOW + "Max Players: " + ChatColor.WHITE + Bukkit.getMaxPlayers(),
                 ChatColor.YELLOW + "Average Ping: " + ChatColor.WHITE + getAveragePing() + "ms",
-                ChatColor.YELLOW + "Server Uptime: " + ChatColor.WHITE + getUptime(),
+                ChatColor.YELLOW + "Server Uptime: " + ChatColor.WHITE + plugin.getFormattedUptime(),
                 ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━"));
 
         // リフレッシュ
@@ -269,18 +271,6 @@ public class OnlinePlayersGUI {
         }
 
         return count > 0 ? String.valueOf(total / count) : "0";
-    }
-
-    /**
-     * サーバー稼働時間を取得
-     */
-    private String getUptime() {
-        long uptimeMillis = plugin.getUptimeMillis();
-
-        long hours = uptimeMillis / (1000 * 60 * 60);
-        long minutes = (uptimeMillis / (1000 * 60)) % 60;
-
-        return String.format("%dh %dm", hours, minutes);
     }
 
     /**
