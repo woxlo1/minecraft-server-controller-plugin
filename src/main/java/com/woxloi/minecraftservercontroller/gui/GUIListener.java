@@ -498,10 +498,26 @@ public class GUIListener implements Listener {
         }
     }
 
+    // =============================
+    // v1.4.2: Add this to GUIListener.java in handleAuditLogs method
+    // =============================
+
     private void handleAuditLogs(Player player, String itemName) {
+        AuditLogGUI gui = new AuditLogGUI(plugin);
+
         switch (itemName) {
             case "Refresh":
-                new AuditLogGUI(plugin).open(player);
+                gui.open(player);
+                break;
+
+            case "◀ Previous Page":
+            case "Previous Page":
+                gui.previousPage(player);
+                break;
+
+            case "Next Page ▶":
+            case "Next Page":
+                gui.nextPage(player);
                 break;
 
             case "Back":

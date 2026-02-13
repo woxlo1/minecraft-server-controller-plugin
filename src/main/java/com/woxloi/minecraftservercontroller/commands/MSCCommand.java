@@ -3,6 +3,7 @@ package com.woxloi.minecraftservercontroller.commands;
 import com.woxloi.minecraftservercontroller.MinecraftServerController;
 import com.woxloi.minecraftservercontroller.api.APIClient;
 import com.woxloi.minecraftservercontroller.gui.MainMenuGUI;
+import com.woxloi.minecraftservercontroller.gui.OnlinePlayersGUI;
 import com.woxloi.minecraftservercontroller.utils.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -324,12 +325,23 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    // =============================
+    // v1.4.2: Replace handlePlayers method in MSCCommand.java
+    // =============================
+
     private boolean handlePlayers(CommandSender sender) {
         if (!sender.hasPermission("msc.players")) {
             sender.sendMessage(ChatColor.RED + "You don't have permission!");
             return true;
         }
 
+        // v1.4.2: プレイヤーの場合はGUIを開く
+        if (sender instanceof Player) {
+            new OnlinePlayersGUI(plugin).open((Player) sender);
+            return true;
+        }
+
+        // コンソールの場合はテキスト表示
         sender.sendMessage(ChatColor.YELLOW + "Fetching players...");
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {

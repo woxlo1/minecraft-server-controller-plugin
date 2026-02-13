@@ -7,30 +7,29 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * プレイヤーアクティビティ統計管理
- * - ログイン/ログアウト履歴
+ * プレイヤーアクティビティ統計管理 (v1.4.2)
+ * - ログイン/ログアウト履歴（JST）
  * - 総プレイ時間
  * - 最終ログイン時刻
+ * - API サーバーへの同期
  */
 public class PlayerActivityTracker implements Listener {
 
     private final MinecraftServerController plugin;
     private final String dbPath;
     private final Map<UUID, Long> sessionStartTimes;
-    // v1.4.1 fix: ログイン時刻をメモリに保持することで
-    //             SQLiteが非対応のUPDATE ORDER BY/LIMITを回避する
     private final Map<UUID, String> sessionLoginTimes;
 
     public PlayerActivityTracker(MinecraftServerController plugin, String dbPath) {
@@ -75,22 +74,24 @@ public class PlayerActivityTracker implements Listener {
     }
 
     /**
-     * プレイヤーログイン処理
+     * プレイヤーログイン処理（v1.4.2: JST使用 + API同期）
      */
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
         String name = player.getName();
-        String nowStr = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+
+        // v1.4.2: JST時刻を使用
+        String nowStr = MinecraftServerController.getCurrentTime()
+                .format(MinecraftServerController.DATETIME_FORMATTER);
 
         sessionStartTimes.put(uuid, System.currentTimeMillis());
-        // v1.4.1 fix: ログイン時刻を文字列で保持しておく
         sessionLoginTimes.put(uuid, nowStr);
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try (Connection conn = getConnection()) {
-                // v1.4.1 fix: INSERT OR IGNORE で重複エラーを防ぐ
+                // INSERT OR IGNORE で重複エラーを防ぐ
                 PreparedStatement ps = conn.prepareStatement(
                         "INSERT OR IGNORE INTO player_activity (uuid, player_name, login_time) VALUES (?, ?, ?)"
                 );
@@ -121,16 +122,18 @@ public class PlayerActivityTracker implements Listener {
     }
 
     /**
-     * プレイヤーログアウト処理
+     * プレイヤーログアウト処理（v1.4.2: JST使用 + API同期）
      */
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
-        String nowStr = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+
+        // v1.4.2: JST時刻を使用
+        String nowStr = MinecraftServerController.getCurrentTime()
+                .format(MinecraftServerController.DATETIME_FORMATTER);
 
         Long sessionStart = sessionStartTimes.remove(uuid);
-        // v1.4.1 fix: ログイン時刻を取り出す
         String loginTime = sessionLoginTimes.remove(uuid);
 
         if (sessionStart == null || loginTime == null) return;
@@ -139,8 +142,7 @@ public class PlayerActivityTracker implements Listener {
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try (Connection conn = getConnection()) {
-                // v1.4.1 fix: ORDER BY/LIMIT を使わず loginTime で直接特定する
-                //             SQLite は UPDATE に ORDER BY/LIMIT を使えない
+                // ログアウト時刻とセッション時間を更新
                 PreparedStatement ps = conn.prepareStatement("""
                     UPDATE player_activity
                     SET logout_time = ?, session_duration = ?

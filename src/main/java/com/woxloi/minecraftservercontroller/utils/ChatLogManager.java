@@ -12,14 +12,13 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * チャットログ管理
+ * チャットログ管理 (v1.4.2: JST timestamps)
  * - チャットメッセージの記録
  * - プレイヤー別フィルタ
  * - キーワード検索
@@ -75,12 +74,16 @@ public class ChatLogManager implements Listener {
     }
 
     /**
-     * チャットメッセージを記録
+     * チャットメッセージを記録（v1.4.2: JST使用）
      */
     @EventHandler
     public void onPlayerChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
         String message = event.getMessage();
+
+        // v1.4.2: JST時刻を使用
+        String nowStr = MinecraftServerController.getCurrentTime()
+                .format(MinecraftServerController.DATETIME_FORMATTER);
 
         try (Connection conn = getConnection()) {
             PreparedStatement ps = conn.prepareStatement("""
@@ -88,7 +91,7 @@ public class ChatLogManager implements Listener {
                 VALUES (?, ?, ?, ?, ?)
             """);
 
-            ps.setString(1, LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            ps.setString(1, nowStr);
             ps.setString(2, player.getUniqueId().toString());
             ps.setString(3, player.getName());
             ps.setString(4, message);
@@ -96,9 +99,7 @@ public class ChatLogManager implements Listener {
 
             ps.executeUpdate();
 
-            // =============================
-            // ★ 新規追加: APIサーバーにも記録
-            // =============================
+            // v1.4.2: APIサーバーにも記録
             try {
                 plugin.getAPIClient().logChatMessage(
                         player.getUniqueId().toString(),
@@ -313,12 +314,8 @@ public class ChatLogManager implements Listener {
         }
 
         public String getFormattedTimestamp() {
-            try {
-                LocalDateTime dt = LocalDateTime.parse(timestamp);
-                return dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"));
-            } catch (Exception e) {
-                return timestamp;
-            }
+            // Already in JST format from DB
+            return timestamp;
         }
     }
 

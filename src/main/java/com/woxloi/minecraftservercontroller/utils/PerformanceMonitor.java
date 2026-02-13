@@ -11,13 +11,11 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * サーバーパフォーマンスモニタリング
+ * サーバーパフォーマンスモニタリング (v1.4.2: JST timestamps)
  * - TPS（Ticks Per Second）
  * - メモリ使用率
  * - エンティティ数
@@ -27,8 +25,6 @@ public class PerformanceMonitor extends BukkitRunnable {
 
     private final MinecraftServerController plugin;
     private final String dbPath;
-    // v1.4.1 fix: tickCount / lastCheck を削除
-    //             runTaskTimer の間隔を 100L にしたため run() は直接処理するだけでよい
 
     public PerformanceMonitor(MinecraftServerController plugin, String dbPath) {
         this.plugin = plugin;
@@ -67,15 +63,13 @@ public class PerformanceMonitor extends BukkitRunnable {
         }
     }
 
-    // v1.4.1 fix: runTaskTimer(this, 20L, 100L) で5秒ごとに呼ばれるため
-    //             カウンタによる間引きが不要になった。run() から直接記録する。
     @Override
     public void run() {
         recordMetrics();
     }
 
     /**
-     * メトリクスを記録
+     * メトリクスを記録（v1.4.2: JST使用）
      */
     private void recordMetrics() {
         try {
@@ -108,6 +102,10 @@ public class PerformanceMonitor extends BukkitRunnable {
                 );
             }
 
+            // v1.4.2: JST時刻を使用
+            String nowStr = MinecraftServerController.getCurrentTime()
+                    .format(MinecraftServerController.DATETIME_FORMATTER);
+
             // DB書き込みとAPI送信は非同期で
             int finalTotalEntities = totalEntities;
             int finalTotalChunks = totalChunks;
@@ -119,7 +117,7 @@ public class PerformanceMonitor extends BukkitRunnable {
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """);
 
-                    ps.setString(1, LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    ps.setString(1, nowStr);
                     ps.setDouble(2, currentTps);
                     ps.setLong(3, memoryUsed);
                     ps.setLong(4, memoryTotal);
