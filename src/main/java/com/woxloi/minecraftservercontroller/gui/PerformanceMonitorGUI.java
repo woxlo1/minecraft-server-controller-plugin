@@ -15,7 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * パフォーマンスモニターGUI
+ * パフォーマンスモニターGUI (v1.4.3 - Enhanced Error Handling)
  */
 public class PerformanceMonitorGUI {
 
@@ -29,23 +29,129 @@ public class PerformanceMonitorGUI {
         player.sendMessage(ChatColor.YELLOW + "Loading performance data...");
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            PerformanceMonitor.CurrentPerformance current = plugin.getPerformanceMonitor().getCurrentPerformance();
-            List<PerformanceMonitor.PerformanceMetric> history = plugin.getPerformanceMonitor().getMetrics(1);
+            PerformanceMonitor.CurrentPerformance current = null;
+            List<PerformanceMonitor.PerformanceMetric> history = new ArrayList<>();
+            String errorMessage = null;
+
+            try {
+                current = plugin.getPerformanceMonitor().getCurrentPerformance();
+
+                if (current != null) {
+                    history = plugin.getPerformanceMonitor().getMetrics(1);
+                }
+            } catch (Exception e) {
+                errorMessage = e.getMessage();
+                plugin.getLogger().warning("Failed to get performance data: " + e.getMessage());
+                if (plugin.getConfig().getBoolean("plugin.debug", false)) {
+                    e.printStackTrace();
+                }
+            }
+
+            final PerformanceMonitor.CurrentPerformance finalCurrent = current;
+            final List<PerformanceMonitor.PerformanceMetric> finalHistory = history;
+            final String finalErrorMessage = errorMessage;
 
             plugin.getServer().getScheduler().runTask(plugin, () -> {
-                displayPerformance(player, current, history);
+                displayPerformance(player, finalCurrent, finalHistory, finalErrorMessage);
             });
         });
     }
 
     private void displayPerformance(Player player, PerformanceMonitor.CurrentPerformance current,
-                                    List<PerformanceMonitor.PerformanceMetric> history) {
+                                    List<PerformanceMonitor.PerformanceMetric> history,
+                                    String errorMessage) {
         Inventory inv = Bukkit.createInventory(null, 54, ChatColor.GOLD + "Performance Monitor");
 
         if (current == null) {
+            // エラー表示を強化
+            long uptime = plugin.getUptimeMillis() / 1000; // 秒単位
+            boolean isDebugMode = plugin.getConfig().getBoolean("plugin.debug", false);
+
+            List<String> errorLore = new ArrayList<>();
+            errorLore.add(ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━");
+            errorLore.add(ChatColor.RED + "Failed to load performance data");
+            errorLore.add("");
+
+            // サーバー稼働時間のチェック
+            if (uptime < 5) {
+                errorLore.add(ChatColor.YELLOW + "⚠ Server just started!");
+                errorLore.add(ChatColor.GRAY + "Uptime: " + uptime + " seconds");
+                errorLore.add("");
+                errorLore.add(ChatColor.WHITE + "Please wait at least 5 seconds");
+                errorLore.add(ChatColor.WHITE + "for data collection to begin.");
+            } else {
+                errorLore.add(ChatColor.YELLOW + "Possible causes:");
+                errorLore.add(ChatColor.GRAY + "• PerformanceMonitor not running");
+                errorLore.add(ChatColor.GRAY + "• Database connection issue");
+                errorLore.add(ChatColor.GRAY + "• TPS calculation unavailable");
+            }
+
+            errorLore.add("");
+            errorLore.add(ChatColor.YELLOW + "Server Info:");
+            errorLore.add(ChatColor.GRAY + "Uptime: " + formatUptime(uptime));
+            errorLore.add(ChatColor.GRAY + "Online Players: " + Bukkit.getOnlinePlayers().size());
+
+            // エラーメッセージがある場合は表示
+            if (errorMessage != null) {
+                errorLore.add("");
+                errorLore.add(ChatColor.RED + "Error Details:");
+                errorLore.add(ChatColor.GRAY + errorMessage);
+            }
+
+            errorLore.add("");
+            errorLore.add(ChatColor.YELLOW + "Troubleshooting:");
+            errorLore.add(ChatColor.WHITE + "1. Wait 5+ seconds after start");
+            errorLore.add(ChatColor.WHITE + "2. Check server logs");
+            errorLore.add(ChatColor.WHITE + "3. Try: /msc reload");
+
+            if (!isDebugMode) {
+                errorLore.add("");
+                errorLore.add(ChatColor.GRAY + "Enable debug mode in config.yml");
+                errorLore.add(ChatColor.GRAY + "for detailed error information");
+            }
+
+            errorLore.add("");
+            errorLore.add(ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━");
+            errorLore.add("");
+            errorLore.add(ChatColor.GOLD + "Click refresh to try again");
+
             inv.setItem(22, createItem(Material.BARRIER,
-                    ChatColor.RED + "Error",
-                    ChatColor.GRAY + "Failed to load performance data"));
+                    ChatColor.RED + "⚠ No Performance Data",
+                    errorLore.toArray(new String[0])));
+
+            // デバッグ情報（管理者のみ）
+            if (player.hasPermission("msc.admin") && isDebugMode) {
+                List<String> debugLore = new ArrayList<>();
+                debugLore.add(ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━");
+                debugLore.add(ChatColor.DARK_RED + "Debug Information");
+                debugLore.add("");
+                debugLore.add(ChatColor.YELLOW + "Monitor Status:");
+
+                try {
+                    PerformanceMonitor monitor = plugin.getPerformanceMonitor();
+                    debugLore.add(ChatColor.GRAY + "Monitor: " + (monitor != null ? "Running" : "NULL"));
+
+                    if (monitor != null) {
+                        debugLore.add(ChatColor.GRAY + "Bukkit TPS: " + Arrays.toString(Bukkit.getTPS()));
+                    }
+                } catch (Exception e) {
+                    debugLore.add(ChatColor.RED + "Exception: " + e.getClass().getSimpleName());
+                    debugLore.add(ChatColor.GRAY + e.getMessage());
+                }
+
+                debugLore.add("");
+                debugLore.add(ChatColor.YELLOW + "System Info:");
+                Runtime runtime = Runtime.getRuntime();
+                debugLore.add(ChatColor.GRAY + "Memory: " +
+                        (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024) +
+                        "/" + runtime.maxMemory() / (1024 * 1024) + " MB");
+                debugLore.add(ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━");
+
+                inv.setItem(40, createItem(Material.REDSTONE_TORCH,
+                        ChatColor.DARK_RED + "🐛 Debug Info",
+                        debugLore.toArray(new String[0])));
+            }
+
         } else {
             // TPS情報
             Material tpsMaterial = current.tps1m >= 19.5 ? Material.GREEN_WOOL :
@@ -123,9 +229,11 @@ public class PerformanceMonitorGUI {
                 graphLore.add(ChatColor.YELLOW + "Last Hour Performance");
                 graphLore.add("");
 
-                for (int i = Math.min(history.size(), 10) - 1; i >= 0; i--) {
+                int displayCount = Math.min(history.size(), 10);
+                for (int i = displayCount - 1; i >= 0; i--) {
                     PerformanceMonitor.PerformanceMetric metric = history.get(i);
-                    String time = metric.timestamp.substring(11, 16);
+                    String time = metric.timestamp.length() >= 16 ?
+                            metric.timestamp.substring(11, 16) : metric.timestamp;
                     String tpsBar = getTpsBar(metric.tps);
                     graphLore.add(ChatColor.GRAY + time + " " + tpsBar +
                             ChatColor.WHITE + String.format(" %.1f TPS", metric.tps));
@@ -137,7 +245,26 @@ public class PerformanceMonitorGUI {
                 inv.setItem(31, createItem(Material.CLOCK,
                         ChatColor.GOLD + "📊 Performance History",
                         graphLore.toArray(new String[0])));
+            } else {
+                // 履歴がない場合
+                inv.setItem(31, createItem(Material.CLOCK,
+                        ChatColor.GOLD + "📊 Performance History",
+                        ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━",
+                        ChatColor.YELLOW + "No history data available",
+                        "",
+                        ChatColor.WHITE + "Data will be collected over time",
+                        ChatColor.GRAY + "Check back in a few minutes",
+                        ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━"));
             }
+
+            // サーバー稼働時間を追加
+            long uptime = plugin.getUptimeMillis() / 1000;
+            inv.setItem(34, createItem(Material.CLOCK,
+                    ChatColor.AQUA + "⏱ Server Uptime",
+                    ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━",
+                    ChatColor.YELLOW + "Uptime: " + ChatColor.WHITE + formatUptime(uptime),
+                    ChatColor.YELLOW + "Started: " + ChatColor.WHITE + plugin.getFormattedStartTime(),
+                    ChatColor.GRAY + "━━━━━━━━━━━━━━━━━━━━"));
         }
 
         // リフレッシュボタン
@@ -197,6 +324,26 @@ public class PerformanceMonitorGUI {
         }
 
         return bar.toString();
+    }
+
+    /**
+     * 稼働時間をフォーマット
+     */
+    private String formatUptime(long seconds) {
+        long days = seconds / 86400;
+        long hours = (seconds % 86400) / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long secs = seconds % 60;
+
+        if (days > 0) {
+            return String.format("%dd %dh %dm", days, hours, minutes);
+        } else if (hours > 0) {
+            return String.format("%dh %dm %ds", hours, minutes, secs);
+        } else if (minutes > 0) {
+            return String.format("%dm %ds", minutes, secs);
+        } else {
+            return String.format("%ds", secs);
+        }
     }
 
     private ItemStack createItem(Material material, String name, String... lore) {

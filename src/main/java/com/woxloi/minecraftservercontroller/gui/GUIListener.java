@@ -82,7 +82,7 @@ public class GUIListener implements Listener {
             case "Server Status":       handleServerStatus(player, itemName);           break;
             case "Backup Management":   handleBackupMenu(player, itemName);             break;
             case "Backup List":         handleBackupList(player, itemName, event.getClick()); break;
-            case "Backup Schedules":    handleBackupSchedules(player, itemName, event.getClick()); break;
+            case "Backup Schedules":    handleBackupSchedules(player, itemName, event.getClick(), event.getSlot()); break;
             case "Player Management":   handlePlayerManagement(player, itemName);       break;
             case "Plugin Management":   handlePluginGUI(player, itemName);              break;
             case "Console Commands":    handleConsole(player, itemName);                break;
@@ -90,10 +90,10 @@ public class GUIListener implements Listener {
             case "MSC Settings":        handleSettings(player, itemName);               break;
             case "Performance Monitor": handlePerformanceMonitor(player, itemName);     break;
             case "World Management":
-                // v1.4.1 fix: clickType と slot を渡してワールド操作を実装
                 handleWorldManagement(player, itemName, event.getClick(), event.getSlot());
                 break;
             case "Chat Log Viewer":     handleChatLog(player, itemName);                break;
+            case "Online Players":      handleOnlinePlayers(player, itemName, event.getClick(), event.getSlot()); break;
         }
     }
 
@@ -161,8 +161,7 @@ public class GUIListener implements Listener {
                 break;
 
             case "Online Players":
-                player.closeInventory();
-                player.performCommand("msc players");
+                new OnlinePlayersGUI(plugin).open(player);
                 break;
 
             case "Server Logs":
@@ -308,8 +307,7 @@ public class GUIListener implements Listener {
     private void handlePlayerManagement(Player player, String itemName) {
         switch (itemName) {
             case "Online Players":
-                player.closeInventory();
-                player.performCommand("msc players");
+                new OnlinePlayersGUI(plugin).open(player);
                 break;
 
             case "Back":
@@ -436,21 +434,41 @@ public class GUIListener implements Listener {
         }
     }
 
-    private void handleBackupSchedules(Player player, String itemName, ClickType clickType) {
-        if (itemName.equals("Cron Format Help")) {
+    private void handleBackupSchedules(Player player, String itemName, ClickType clickType, int slot) {
+        // ヘルプ・統計・ナビゲーション系のアイテム
+        if (itemName.equals("📖 Preset Examples") ||
+                itemName.equals("❓ Cron Format Help") ||
+                itemName.equals("📊 Statistics") ||
+                itemName.equals("➕ Create New Schedule")) {
             return;
         }
 
-        if (itemName.equals("Back")) {
+        if (itemName.equals("🔄 Refresh") || itemName.equals("Refresh")) {
+            new BackupScheduleGUI(plugin).open(player);
+            return;
+        }
+
+        if (itemName.equals("⬅ Back") || itemName.equals("Back")) {
             new MainMenuGUI(plugin).open(player);
             return;
         }
 
-        player.closeInventory();
-        player.sendMessage(ChatColor.YELLOW + "Schedule management: " + itemName);
-        player.sendMessage(ChatColor.GRAY + "Use commands:");
-        player.sendMessage(ChatColor.WHITE + "/msc schedule toggle <id>");
-        player.sendMessage(ChatColor.WHITE + "/msc schedule delete <id>");
+        // スケジュールアイテム（スロット 0〜44）
+        if (slot >= 45) return;
+
+        // BackupScheduleGUI からスケジュールIDを取得
+        BackupScheduleGUI gui = new BackupScheduleGUI(plugin);
+        int scheduleId = gui.getScheduleIdFromSlot(player, slot);
+
+        if (scheduleId == -1) return;
+
+        if (clickType.isLeftClick()) {
+            // 左クリック: 有効/無効を切り替え
+            gui.toggleSchedule(player, scheduleId);
+        } else if (clickType.isRightClick()) {
+            // 右クリック: 削除
+            gui.deleteSchedule(player, scheduleId);
+        }
     }
 
     private void handleConsole(Player player, String itemName) {
@@ -498,10 +516,6 @@ public class GUIListener implements Listener {
         }
     }
 
-    // =============================
-    // v1.4.2: Add this to GUIListener.java in handleAuditLogs method
-    // =============================
-
     private void handleAuditLogs(Player player, String itemName) {
         AuditLogGUI gui = new AuditLogGUI(plugin);
 
@@ -518,6 +532,10 @@ public class GUIListener implements Listener {
             case "Next Page ▶":
             case "Next Page":
                 gui.nextPage(player);
+                break;
+
+            case "Statistics":
+                // 統計表示のみ
                 break;
 
             case "Back":
@@ -561,23 +579,24 @@ public class GUIListener implements Listener {
     private void handlePerformanceMonitor(Player player, String itemName) {
         switch (itemName) {
             case "🔄 Refresh":
+            case "Refresh":
                 new PerformanceMonitorGUI(plugin).open(player);
                 break;
 
             case "⬅ Back":
+            case "Back":
                 new MainMenuGUI(plugin).open(player);
                 break;
         }
     }
 
-    // v1.4.1 fix: clickType と slot を引数に追加して実際のワールド操作を実装
     private void handleWorldManagement(Player player, String itemName, ClickType clickType, int slot) {
-        if (itemName.equals("🔄 Refresh")) {
+        if (itemName.equals("🔄 Refresh") || itemName.equals("Refresh")) {
             new WorldManagementGUI(plugin).open(player);
             return;
         }
 
-        if (itemName.equals("⬅ Back")) {
+        if (itemName.equals("⬅ Back") || itemName.equals("Back")) {
             new MainMenuGUI(plugin).open(player);
             return;
         }
@@ -594,9 +613,7 @@ public class GUIListener implements Listener {
             return;
         }
 
-        // v1.4.1 fix: アイテム名から "✓ " / "○ " プレフィックスとカラーコードを除いてワールド名を取得
-        //             WorldManagementGUI のアイテム名フォーマット:
-        //             (ChatColor.GREEN + "✓ " | ChatColor.GRAY + "○ ") + ChatColor.AQUA + worldName
+        // アイテム名から "✓ " / "○ " プレフィックスとカラーコードを除いてワールド名を取得
         String worldName = ChatColor.stripColor(itemName).replaceAll("^[✓○] ", "").trim();
         if (worldName.isEmpty()) return;
 
@@ -648,10 +665,12 @@ public class GUIListener implements Listener {
     private void handleChatLog(Player player, String itemName) {
         switch (itemName) {
             case "🔄 Refresh":
+            case "Refresh":
                 new ChatLogViewerGUI(plugin).open(player);
                 break;
 
             case "⬅ Back":
+            case "Back":
                 new MainMenuGUI(plugin).open(player);
                 break;
 
@@ -660,6 +679,59 @@ public class GUIListener implements Listener {
             case "📊 Chat Statistics":
                 // 情報表示のみ
                 break;
+        }
+    }
+
+    /**
+     * v1.4.3: オンラインプレイヤーGUIのクリック処理
+     */
+    private void handleOnlinePlayers(Player viewer, String itemName, ClickType clickType, int slot) {
+        if (itemName.equals("🔄 Refresh") || itemName.equals("Refresh")) {
+            new OnlinePlayersGUI(plugin).open(viewer);
+            return;
+        }
+
+        if (itemName.equals("⬅ Back") || itemName.equals("Back")) {
+            new MainMenuGUI(plugin).open(viewer);
+            return;
+        }
+
+        if (itemName.equals("サーバー情報") || itemName.equals("📊 Server Statistics")) {
+            // 統計表示のみ
+            return;
+        }
+
+        // プレイヤーアイテム（スロット 9〜44）
+        if (slot < 9 || slot >= 45) return;
+
+        // プレイヤー名を取得（カラーコードを除去）
+        String targetName = ChatColor.stripColor(itemName);
+        Player target = Bukkit.getPlayer(targetName);
+
+        if (target == null) {
+            viewer.sendMessage(ChatColor.RED + "Player not found or offline: " + targetName);
+            return;
+        }
+
+        if (clickType == ClickType.SHIFT_LEFT || clickType == ClickType.SHIFT_RIGHT) {
+            // Shift+クリック: 管理オプションGUIを開く
+            if (!viewer.hasPermission("msc.admin")) {
+                viewer.sendMessage(ChatColor.RED + "You don't have permission to manage players!");
+                return;
+            }
+            new OnlinePlayersGUI(plugin).openManagementOptions(viewer, target);
+
+        } else if (clickType.isLeftClick()) {
+            // 左クリック: インベントリ表示
+            viewer.closeInventory();
+            viewer.openInventory(target.getInventory());
+            viewer.sendMessage(ChatColor.GREEN + "Viewing " + target.getName() + "'s inventory");
+
+        } else if (clickType.isRightClick()) {
+            // 右クリック: テレポート
+            viewer.closeInventory();
+            viewer.teleport(target.getLocation());
+            viewer.sendMessage(ChatColor.GREEN + "Teleported to " + target.getName());
         }
     }
 }

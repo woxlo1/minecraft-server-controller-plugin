@@ -890,6 +890,7 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
         PerformanceMonitor.CurrentPerformance perf = plugin.getPerformanceMonitor().getCurrentPerformance();
         if (perf == null) {
             sender.sendMessage(ChatColor.RED + "Failed to get performance data");
+            sender.sendMessage(ChatColor.YELLOW + "Make sure the server has been running for at least 5 seconds");
             return true;
         }
 
@@ -1215,44 +1216,35 @@ public class MSCCommand implements CommandExecutor, TabCompleter {
 
         sender.sendMessage(ChatColor.YELLOW + "Fetching statistics...");
 
+        final UUID targetUuid = target.getUniqueId();
         final String targetName = target.getName();
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            try {
-                APIClient.PlayerStats stats = plugin.getAPIClient().getPlayerStats(targetName);
+            // ローカルデータベースから統計を取得
+            PlayerActivityTracker.PlayerStats stats = plugin.getActivityTracker().getPlayerStats(targetUuid);
 
-                if (stats == null) {
-                    sender.sendMessage(ChatColor.YELLOW + "No statistics found for " + targetName);
-                    return;
-                }
+            if (stats == null) {
+                sender.sendMessage(ChatColor.YELLOW + "No statistics found for " + targetName);
+                sender.sendMessage(ChatColor.GRAY + "Player needs to log in at least once after plugin installation");
+                return;
+            }
 
-                sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + stats.playerName + "'s Stats" + ChatColor.GOLD + " ==========");
-                sender.sendMessage(ChatColor.YELLOW + "Total Playtime: " + ChatColor.WHITE +
-                        String.format("%.1f hours", stats.totalPlaytimeHours));
-                sender.sendMessage(ChatColor.YELLOW + "Total Sessions: " + ChatColor.WHITE + stats.totalSessions);
-                sender.sendMessage(ChatColor.YELLOW + "First Join: " + ChatColor.WHITE + stats.firstJoin);
-                sender.sendMessage(ChatColor.YELLOW + "Last Join: " + ChatColor.WHITE + stats.lastJoin);
+            sender.sendMessage(ChatColor.GOLD + "========== " + ChatColor.GREEN + stats.playerName + "'s Stats" + ChatColor.GOLD + " ==========");
+            sender.sendMessage(ChatColor.YELLOW + "Total Playtime: " + ChatColor.WHITE + stats.getFormattedPlaytime());
+            sender.sendMessage(ChatColor.YELLOW + "Total Sessions: " + ChatColor.WHITE + stats.totalSessions);
+            sender.sendMessage(ChatColor.YELLOW + "First Join: " + ChatColor.WHITE + stats.firstJoin);
+            sender.sendMessage(ChatColor.YELLOW + "Last Join: " + ChatColor.WHITE + stats.lastJoin);
 
-                if (stats.recentActivity != null && !stats.recentActivity.isEmpty()) {
-                    sender.sendMessage("");
-                    sender.sendMessage(ChatColor.GOLD + "Recent Activity:");
-
-                    int count = 0;
-                    for (APIClient.ActivityRecord activity : stats.recentActivity) {
-                        if (count >= 5) break;
-
-                        String loginTime = activity.login;
-                        String status = activity.logout != null
-                                ? "→ Logout: " + activity.logout + " (" + activity.durationMinutes + " min)"
-                                : "→ Currently online";
-
-                        sender.sendMessage(ChatColor.GRAY + "  • " + loginTime + " " + status);
-                        count++;
+            // 最近のアクティビティを取得
+            String recentActivity = plugin.getActivityTracker().getRecentActivity(targetUuid, 5);
+            if (!recentActivity.isEmpty()) {
+                sender.sendMessage("");
+                sender.sendMessage(ChatColor.GOLD + "Recent Activity:");
+                for (String line : recentActivity.split("\n")) {
+                    if (!line.trim().isEmpty()) {
+                        sender.sendMessage(ChatColor.GRAY + "  " + line);
                     }
                 }
-
-            } catch (Exception e) {
-                sender.sendMessage(ChatColor.RED + "✗ Failed to get stats: " + e.getMessage());
             }
         });
 
