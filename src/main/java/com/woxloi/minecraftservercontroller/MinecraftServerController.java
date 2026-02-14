@@ -1,6 +1,5 @@
 package com.woxloi.minecraftservercontroller;
 
-import com.woxloi.minecraftservercontroller.gui.EnhancedGUIListener;
 import com.woxloi.minecraftservercontroller.utils.*;
 import org.bukkit.plugin.java.JavaPlugin;
 import com.woxloi.minecraftservercontroller.commands.MSCCommand;
@@ -95,7 +94,6 @@ public class MinecraftServerController extends JavaPlugin {
 
         // GUIリスナーの登録
         getServer().getPluginManager().registerEvents(new GUIListener(this), this);
-        getServer().getPluginManager().registerEvents(new EnhancedGUIListener(this), this);
 
         getLogger().info("MinecraftServerController v1.4.1 has been enabled!");
         getLogger().info("Server started at: " + getFormattedStartTime());
